@@ -19,6 +19,7 @@ It covers:
 - Control Domains,
 - Control Leases,
 - Representation Grant references,
+- Session Policy references,
 - Runtime events,
 - event ordering,
 - audit correlation.
@@ -91,6 +92,7 @@ The following entities MUST have unique identifiers:
 - Participant
 - Controller
 - Control Lease
+- Session Policy instance
 - Compliance Policy instance
 - Runtime Event
 
@@ -126,7 +128,8 @@ session_...
 participant_...
 controller_...
 lease_...
-policy_...
+session_policy_...
+compliance_policy_...
 event_...
 ```
 
@@ -212,6 +215,8 @@ RepresentationGrantRef
     allowed_presence_modes[]
     status
     restrictions?
+    authorization_reference?
+    authorization_version?
 ```
 
 Runtime Core may receive this from:
@@ -222,6 +227,10 @@ Runtime Core may receive this from:
 - another authorization provider.
 
 The original external credential may remain outside Runtime Core.
+
+Where a Representation Grant is derived from an external consent, authorization or policy artifact, Runtime SHOULD retain a stable reference and version sufficient to identify which authorization state was in force.
+
+Runtime Core does not define the legal meaning or storage format of that external artifact.
 
 ---
 
@@ -281,6 +290,7 @@ Session
     presence_mode
     operational_state
     representation_grant_ids[]
+    session_policy_id?
     compliance_policy_id?
     created_at
     started_at?
@@ -291,7 +301,27 @@ Session state MUST be independently addressable.
 
 ---
 
-# 14. Session Status
+# 14. Session Policy Reference
+
+Runtime Core SHOULD support a Session Policy reference.
+
+Conceptually:
+
+```text
+SessionPolicyRef
+    policy_id
+    session_id
+    version
+    status
+```
+
+The effective Session-specific restrictions may be normalized separately.
+
+A change of Session Policy version MUST be distinguishable in Runtime state and audit events.
+
+---
+
+# 15. Session Status
 
 The reference model SHOULD distinguish lifecycle status from Operational State.
 
@@ -310,7 +340,7 @@ More detailed physical states belong to Operational State.
 
 ---
 
-# 15. Presence Mode
+# 16. Presence Mode
 
 Normative Presence Mode values for v0.1:
 
@@ -326,7 +356,7 @@ Unknown future Presence Modes must not be silently interpreted as one of these t
 
 ---
 
-# 16. Operational State
+# 17. Operational State
 
 Operational State is extensible.
 
@@ -356,7 +386,7 @@ booster:custom_mode
 
 ---
 
-# 17. Participant
+# 18. Participant
 
 A Participant is any entity taking part in a Session.
 
@@ -386,7 +416,7 @@ The list may be extended.
 
 ---
 
-# 18. Controller
+# 19. Controller
 
 A Controller is an entity capable of producing actions for one or more Control Domains.
 
@@ -414,7 +444,7 @@ A Participant may exist without being a Controller.
 
 ---
 
-# 19. Control Domain
+# 20. Control Domain
 
 Control Domain identifiers are strings.
 
@@ -444,7 +474,7 @@ Twin Runtime MUST NOT assume that every integration supports every domain.
 
 ---
 
-# 20. Control Lease
+# 21. Control Lease
 
 Minimal Lease model:
 
@@ -468,7 +498,7 @@ ControlLease
 
 ---
 
-# 21. Lease Generation
+# 22. Lease Generation
 
 Each new authority assignment for a Session + Control Domain SHOULD increment a monotonically increasing generation number.
 
@@ -486,7 +516,7 @@ A command associated with generation 12 must not be accepted while generation 13
 
 ---
 
-# 22. Why Generation Exists
+# 23. Why Generation Exists
 
 Transport systems may deliver delayed messages.
 
@@ -510,7 +540,7 @@ This protects against:
 
 ---
 
-# 23. Lease Status
+# 24. Lease Status
 
 Minimum values:
 
@@ -525,7 +555,7 @@ Only `active` authorizes new actions.
 
 ---
 
-# 24. Lease Replacement
+# 25. Lease Replacement
 
 When authority changes:
 
@@ -543,7 +573,7 @@ The Runtime MAY keep Lease A for audit history.
 
 ---
 
-# 25. Command Envelope
+# 26. Command Envelope
 
 RFC-0002 proposes that every protected Runtime action can be normalized into a command context equivalent to:
 
@@ -563,7 +593,7 @@ Exact serialization is deferred.
 
 ---
 
-# 26. Command Identifier
+# 27. Command Identifier
 
 Every protected command SHOULD have a unique `command_id`.
 
@@ -576,7 +606,7 @@ This allows:
 
 ---
 
-# 27. Command Payload
+# 28. Command Payload
 
 Runtime Core must not require all payloads to use one universal format.
 
@@ -599,7 +629,7 @@ Integration remains responsible for action semantics.
 
 ---
 
-# 28. Runtime Event Model
+# 29. Runtime Event Model
 
 Every significant Runtime state change MUST produce an event.
 
@@ -620,6 +650,7 @@ RuntimeEvent
 
     lease_id?
     grant_id?
+    session_policy_id?
 
     control_domain?
 
@@ -630,7 +661,7 @@ RuntimeEvent
 
 ---
 
-# 29. Event Time
+# 30. Event Time
 
 Events MUST contain an `occurred_at` timestamp.
 
@@ -646,7 +677,7 @@ Runtime MUST NOT assume that clocks from all external devices are perfectly sync
 
 ---
 
-# 30. Event Ordering
+# 31. Event Ordering
 
 Wall-clock timestamps alone are not sufficient for ordering security-critical Runtime events.
 
@@ -668,7 +699,7 @@ Example:
 
 ---
 
-# 31. Event Identifier vs Sequence
+# 32. Event Identifier vs Sequence
 
 These have different purposes:
 
@@ -688,7 +719,7 @@ Both SHOULD be present in Session-scoped Runtime events.
 
 ---
 
-# 32. Minimum Event Types
+# 33. Minimum Event Types
 
 Twin Runtime v0.1 MUST define at least:
 
@@ -706,6 +737,9 @@ presence_mode.changed
 representation_grant.activated
 representation_grant.revoked
 representation_grant.expired
+
+session_policy.changed
+runtime_control.revoked
 
 lease.issued
 lease.renewed
@@ -727,7 +761,7 @@ compliance_policy.changed
 
 ---
 
-# 33. Optional High-Volume Events
+# 34. Optional High-Volume Events
 
 Runtime SHOULD NOT require every successful realtime action to become a persisted audit event.
 
@@ -752,7 +786,7 @@ Examples:
 
 ---
 
-# 34. Event Actor
+# 35. Event Actor
 
 Where applicable, an event should distinguish:
 
@@ -777,7 +811,7 @@ The AI may act on behalf of the Identity Owner but is not the Identity Owner.
 
 ---
 
-# 35. Event Correlation
+# 36. Event Correlation
 
 Events related to one operation SHOULD share a `correlation_id`.
 
@@ -794,7 +828,7 @@ may all belong to one takeover operation.
 
 ---
 
-# 36. Control Handover Event
+# 37. Control Handover Event
 
 A handover event SHOULD identify:
 
@@ -815,7 +849,7 @@ This allows reconstruction of control history.
 
 ---
 
-# 37. Presence Mode Change Event
+# 38. Presence Mode Change Event
 
 A Presence Mode transition event SHOULD contain:
 
@@ -836,7 +870,7 @@ reason: owner_requested_break
 
 ---
 
-# 38. Command Rejection Event
+# 39. Command Rejection Event
 
 A rejection event SHOULD expose a stable machine-readable reason.
 
@@ -851,6 +885,7 @@ wrong_controller
 wrong_session
 wrong_control_domain
 representation_not_authorized
+session_policy_denied
 presence_mode_not_allowed
 compliance_denied
 capability_unavailable
@@ -861,7 +896,7 @@ The final list may expand.
 
 ---
 
-# 39. Sensitive Data
+# 40. Sensitive Data
 
 Runtime events SHOULD avoid unnecessary sensitive personal data.
 
@@ -884,7 +919,7 @@ Commercial and KYC data remain outside Runtime Core.
 
 ---
 
-# 40. Observation Source
+# 41. Observation Source
 
 Runtime may model available observation streams using:
 
@@ -905,7 +940,7 @@ It does not transport the raw stream.
 
 ---
 
-# 41. Observation Modalities
+# 42. Observation Modalities
 
 Reference modalities may include:
 
@@ -932,7 +967,7 @@ The namespace MUST remain extensible.
 
 ---
 
-# 42. Capability Reference
+# 43. Capability Reference
 
 Runtime v0.1 may use capability identifiers without defining a universal capability system.
 
@@ -959,7 +994,7 @@ Capability discovery may later integrate with external systems.
 
 ---
 
-# 43. Readiness Snapshot
+# 44. Readiness Snapshot
 
 Reference conceptual model:
 
@@ -988,7 +1023,7 @@ unknown
 
 ---
 
-# 44. Compliance Policy Reference
+# 45. Compliance Policy Reference
 
 Runtime Core SHOULD treat Compliance Policy as an external policy input.
 
@@ -1007,7 +1042,7 @@ The effective technical restrictions may be normalized separately.
 
 ---
 
-# 45. Effective Policy
+# 46. Effective Policy
 
 Runtime may normalize applicable restrictions into an internal structure such as:
 
@@ -1027,7 +1062,7 @@ The exact schema is deferred.
 
 ---
 
-# 46. State vs Event
+# 47. State vs Event
 
 Twin Runtime must distinguish:
 
@@ -1055,7 +1090,7 @@ Runtime must not rely only on mutable state for audit reconstruction.
 
 ---
 
-# 47. Reference Session Snapshot
+# 48. Reference Session Snapshot
 
 A possible normalized snapshot:
 
@@ -1070,6 +1105,8 @@ SessionSnapshot
     active_grants[]
     active_leases[]
 
+    session_policy_id?
+
     participants[]
     controllers[]
 
@@ -1083,7 +1120,7 @@ This is conceptual, not yet a wire schema.
 
 ---
 
-# 48. Reference Bridge Example
+# 49. Reference Bridge Example
 
 ```text
 Session:
@@ -1114,7 +1151,7 @@ This single snapshot describes who currently controls what.
 
 ---
 
-# 49. Reference Handover Example
+# 50. Reference Handover Example
 
 Before:
 
@@ -1147,7 +1184,7 @@ REJECT: stale_generation
 
 ---
 
-# 50. MultiPresence Data Model
+# 51. MultiPresence Data Model
 
 Multiple Sessions may reference the same `owner_id`.
 
@@ -1165,9 +1202,17 @@ No Session may infer control authority from another Session.
 
 Leases remain isolated by `session_id`.
 
+Runtime MUST support an authorized lookup equivalent to:
+
+```text
+active Sessions for owner_id
+```
+
+The lookup returns Session references or snapshots and does not imply cross-Session control authority.
+
 ---
 
-# 51. Data Model Independence
+# 52. Data Model Independence
 
 The model MUST NOT assume:
 
@@ -1182,7 +1227,7 @@ Reference implementation choices remain separate.
 
 ---
 
-# 52. Serialization Direction
+# 53. Serialization Direction
 
 The likely v0.1 serialization will be JSON-compatible.
 
@@ -1198,7 +1243,7 @@ Normative schemas will be defined after this RFC is accepted.
 
 ---
 
-# 53. Versioning
+# 54. Versioning
 
 Normative Runtime objects SHOULD carry or inherit a schema/runtime version.
 
@@ -1213,7 +1258,7 @@ Exact placement remains undecided.
 
 ---
 
-# 54. Extensibility
+# 55. Extensibility
 
 Runtime-defined structures SHOULD support extension without allowing extensions to override core semantics.
 
@@ -1231,7 +1276,7 @@ or equivalent.
 
 ---
 
-# 55. Unknown Fields
+# 56. Unknown Fields
 
 Future compatible implementations SHOULD tolerate unknown non-critical extension fields.
 
@@ -1239,7 +1284,7 @@ They MUST NOT silently accept unknown values that alter authorization semantics.
 
 ---
 
-# 56. Proposed v0.1 Defaults
+# 57. Proposed v0.1 Defaults
 
 RFC-0002 proposes the following implementation defaults:
 
@@ -1252,11 +1297,13 @@ RFC-0002 proposes the following implementation defaults:
 7. event payloads minimize personal data,
 8. high-volume sensor streams remain outside Runtime Core,
 9. core Runtime data is JSON-compatible,
-10. final JSON Schema is defined separately.
+10. Session Policy references are version-identifiable,
+11. Representation Grants may retain a stable external authorization reference and version,
+12. final JSON Schema is defined separately.
 
 ---
 
-# 57. Open Decisions
+# 58. Open Decisions
 
 The following remain open:
 
@@ -1271,6 +1318,8 @@ Milliseconds vs microseconds vs nanoseconds.
 ### Event persistence
 
 Append-only file, database, event store or pluggable interface.
+
+No blockchain or distributed-ledger mechanism is required by this RFC.
 
 ### Command deduplication
 
@@ -1304,10 +1353,10 @@ Whether modalities should eventually align with another standard vocabulary.
 
 ---
 
-# 58. Proposed Decision
+# 59. Proposed Decision
 
 Adopt the following v0.1 model:
 
-> **Twin Runtime uses opaque stable identifiers, Session-scoped event ordering, Control-Domain-scoped Lease generations and structured Runtime events. High-volume data remains outside Runtime Core, while Runtime maintains authorization, references and auditable state transitions.**
+> **Twin Runtime uses opaque stable identifiers, version-identifiable policy references, Session-scoped event ordering, Control-Domain-scoped Lease generations and structured Runtime events. High-volume data remains outside Runtime Core, while Runtime maintains authorization, references and auditable state transitions.**
 
 This model becomes the basis for the first normative schemas and Core implementation.
