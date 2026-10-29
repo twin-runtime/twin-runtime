@@ -13,6 +13,7 @@ This RFC defines the conceptual relationship between:
 - Identity Owner,
 - Representation Grant,
 - Session,
+- Session Policy,
 - Control Domain,
 - Control Lease,
 - controller,
@@ -36,6 +37,7 @@ This RFC defines:
 
 - how a Session is created and identified,
 - how representation authority is attached to a Session,
+- how Session Policy constrains Runtime authority,
 - how controllers receive temporary authority,
 - how control authority expires or is revoked,
 - how handover works,
@@ -142,6 +144,7 @@ Session
     presence_mode
     operational_state
     representation_context
+    session_policy_context
     compliance_context
     participants
     control_leases
@@ -150,6 +153,36 @@ Session
 A Session is independently addressable.
 
 One Identity Owner may have multiple simultaneous Sessions.
+
+---
+
+### 4.4.1 Session Policy
+
+A Session Policy defines Runtime-level permissions and restrictions for one Session.
+
+Conceptually:
+
+```text
+SessionPolicy
+    policy_id
+    session_id
+    version
+    restrictions
+    required_approvals
+    fallback_permissions
+    observation_permissions
+    status
+```
+
+A Session Policy is separate from:
+
+- Representation Grant,
+- Compliance Policy,
+- Control Lease.
+
+It may constrain authority that would otherwise be permitted by a Representation Grant or Control Lease.
+
+It does not replace legal agreements, Marketplace policy or applicable law.
 
 ---
 
@@ -266,6 +299,10 @@ A Grant may authorize:
 - a class of approved controllers,
 - another technical subject.
 
+If a Representation Grant expires or is revoked, Runtime authority that depends on that Grant must no longer authorize new actions.
+
+An existing Control Lease does not override expiration or revocation of its underlying Representation Grant.
+
 The exact subject model is defined later.
 
 ---
@@ -353,6 +390,23 @@ AI ────┘
 
 Twin Runtime does not define the internal blending algorithm.
 
+### 9.1 Controller of Record
+
+For every active Control Domain, Runtime must be able to identify the currently authoritative Controller.
+
+Example:
+
+```text
+conversation → Identity Owner
+gesture      → Identity Owner
+mobility     → AI
+navigation   → AI
+```
+
+Controller-of-record state must be derived from current Runtime authority.
+
+A connected transport participant is not the controller-of-record unless current Runtime authority makes it so.
+
 ---
 
 ## 10. Lease Lifecycle
@@ -411,6 +465,17 @@ Revocation must:
 Transport connectivity must not override revocation.
 
 A Controller may remain connected but must lose authority.
+
+### 12.1 Representation Grant Revocation Cascade
+
+If a Representation Grant expires or is revoked:
+
+1. Runtime must mark the Grant as no longer valid for authorization.
+2. Control Leases whose authority depends on that Grant must no longer authorize new commands.
+3. Runtime must evaluate the configured Fallback Policy for affected Control Domains.
+4. Runtime must emit audit events sufficient to reconstruct the authorization loss.
+
+Runtime must not allow a dependent Lease to remain authoritative merely because the Lease itself has not yet reached its own expiration time.
 
 ---
 
@@ -735,10 +800,13 @@ Each Session has independent:
 
 - Presence Mode,
 - Representation context,
+- Session Policy context,
 - Control Leases,
 - controllers,
 - audit events,
 - Compliance Policy.
+
+Runtime must provide a mechanism for an authorized caller to enumerate active Sessions associated with a specific Identity Owner.
 
 No global Control Lease exists across all Sessions in v0.1.
 
@@ -773,6 +841,14 @@ Control Leases remain Session-scoped.
 ---
 
 ## 28. Compliance Interaction
+
+Session Policy and Compliance Policy may independently restrict Lease issuance or action execution.
+
+Session Policy expresses Session-specific Runtime permissions and restrictions.
+
+Compliance Policy expresses externally supplied technical constraints derived from jurisdiction, location or context.
+
+Neither is replaced by the other.
 
 Compliance Policy may further restrict Lease issuance or action execution.
 
@@ -809,16 +885,40 @@ identify Controller
 identify Control Domain
   │
   ▼
-validate Lease
+validate Representation Grant
   │
   ▼
-validate Runtime policy
+validate Session Policy
+  │
+  ▼
+validate Presence Mode
+  │
+  ▼
+validate Compliance Policy
+  │
+  ▼
+validate Lease
   │
   ▼
 ACCEPT / REJECT
 ```
 
 Local OEM safety remains the final physical authority after Runtime acceptance.
+
+### 29.1 Session-wide Runtime Control Revocation
+
+Twin Runtime must support authorized Session-wide revocation of Runtime control authority.
+
+A Session-wide Runtime control revocation must:
+
+- invalidate active Runtime Control Leases for that Session,
+- reject new commands relying on those Leases,
+- evaluate configured Fallback Policies,
+- emit an audit event.
+
+This mechanism is separate from the physical OEM emergency stop.
+
+Runtime must not claim that a physical emergency stop occurred unless an underlying integration explicitly confirms it.
 
 ---
 
@@ -832,6 +932,9 @@ Session ended
 
 Representation Grant activated
 Representation Grant revoked
+
+Session Policy changed
+Session-wide Runtime control revoked
 
 Lease issued
 Lease renewed
@@ -977,8 +1080,12 @@ This RFC establishes the following invariants:
 11. **TotalMersion cannot silently become Autonomous.**
 12. **Ending a Session terminates its control authority.**
 13. **Multiple Sessions belonging to the same Identity Owner remain independently authorized.**
-14. **Compliance Policy can further restrict otherwise valid authority.**
-15. **Local OEM safety remains above Runtime control authority.**
+14. **Session Policy can further restrict otherwise valid authority.**
+15. **Compliance Policy can further restrict otherwise valid authority.**
+16. **Expired or revoked Representation Grants cannot continue authorizing dependent Runtime actions.**
+17. **Controller-of-record is derived from current Runtime authority, not transport connectivity.**
+18. **Session-wide Runtime control revocation is separate from physical OEM emergency stop.**
+19. **Local OEM safety remains above Runtime control authority.**
 
 ---
 
@@ -1055,6 +1162,6 @@ These decisions require separate RFCs or implementation specifications.
 
 Adopt the following conceptual model for Twin Runtime v0.1:
 
-> **A Session represents an Identity Owner under a valid Representation Grant. Controllers receive temporary authority through scoped Control Leases. Each Control Domain has at most one active Controller, and authority changes are explicit, revocable and auditable.**
+> **A Session represents an Identity Owner under a valid Representation Grant and applicable Session Policy. Controllers receive temporary authority through scoped Control Leases. Each Control Domain has at most one active Controller, and authority changes are explicit, revocable and auditable.**
 
 This model becomes the foundation for subsequent schemas, APIs, Edge Enforcement and conformance tests.
