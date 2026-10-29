@@ -12,7 +12,7 @@ The project is intended to enable third-party developers and companies to build 
 2. Integrate with existing robotics stacks instead of rebuilding them.
 3. Keep the runtime independent from the Twin.rent Marketplace.
 4. Do not introduce mandatory dependencies on proprietary Twin.rent services.
-5. Do not introduce Open Mercato or any other control-plane framework unless explicitly approved in an architectural decision or RFC.
+5. Do not introduce mandatory control-plane frameworks unless explicitly approved in an architectural decision or RFC.
 
 ## Control model
 
