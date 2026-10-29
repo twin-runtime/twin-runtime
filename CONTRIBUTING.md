@@ -6,20 +6,21 @@ We welcome contributions from individual developers, robotics companies, integra
 
 ## How to contribute
 
-1. Open an Issue or Discussion before starting significant architectural work.
-2. Fork the repository.
-3. Create a dedicated branch.
-4. Make your changes.
-5. Add or update relevant tests and documentation.
-6. Submit a Pull Request.
+Twin Runtime is currently in an early development phase.
+
+Contributions to the official repository are currently accepted only from explicitly approved collaborators.
+
+Public users may read, fork and use the project under the Apache License 2.0, but Pull Request submission to the official repository is restricted at this stage.
+
+Significant architectural proposals may be discussed with the maintainers before implementation.
 
 ## Pull Requests
 
-Keep pull requests focused on one problem or feature.
+Approved collaborators should keep pull requests focused on one problem or feature.
 
 Significant changes to the protocol, APIs, safety model or architecture should be discussed before implementation.
 
-All contributions are subject to review and automated testing.
+All accepted contributions are subject to review and automated testing.
 
 ## Commercial use
 
