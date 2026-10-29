@@ -58,6 +58,7 @@ Twin Runtime v0.1 **MUST** model at least:
 - Representation Grant,
 - Deployment,
 - Session,
+- Session Policy,
 - Participant,
 - Presence Mode,
 - Operational State,
@@ -110,6 +111,11 @@ A Representation Grant:
 - **MUST** be independently revocable.
 - **MUST** be associated with a unique identifier.
 - **MUST** be auditable.
+- **MUST NOT** continue authorizing Runtime actions after it expires or is revoked.
+
+Revocation or expiration of a Representation Grant **MUST** invalidate Runtime authority that depends on that Grant.
+
+Any active Control Lease that depends on an invalid Representation Grant **MUST NOT** authorize new commands.
 
 Twin Runtime **MUST NOT** claim that a Representation Grant is itself the underlying legal contract or commercial license.
 
@@ -150,6 +156,7 @@ Every Session **MUST** have:
 - current Operational State,
 - active Control Leases,
 - applicable Representation Grant or Grants,
+- applicable Session Policy or policy reference,
 - applicable Compliance Policy or policy reference,
 - audit/event context.
 
@@ -158,6 +165,30 @@ A Session:
 - **MAY** exist inside a Deployment,
 - **MAY** be purely digital,
 - **MUST NOT** assume one physical robot per Identity Owner.
+
+### 8.1 Session Policy
+
+Twin Runtime **MUST** support a Runtime-level Session Policy.
+
+A Session Policy is separate from:
+
+- the Representation Grant,
+- the Compliance Policy,
+- the Control Lease.
+
+A Session Policy **MAY** constrain:
+
+- actions,
+- autonomy,
+- Control Domains,
+- required Identity Owner approval for selected actions,
+- permitted fallback behaviour,
+- observation or recording access,
+- other Session-specific operating permissions.
+
+Runtime **MUST** enforce an applicable Session Policy where the relevant action passes through Runtime authorization.
+
+A Session Policy **MUST NOT** be treated as a replacement for legal agreements, Marketplace policy or applicable law.
 
 ---
 
@@ -204,6 +235,7 @@ In Autonomous mode:
 
 - AI or another autonomous controller **MAY** hold Control Leases.
 - Autonomous behaviour **MUST** remain within the applicable Representation Grant.
+- Autonomous behaviour **MUST** remain within the applicable Session Policy.
 - Autonomous behaviour **MUST** remain within the effective Compliance Policy.
 - Autonomous controllers **MUST NOT** receive authority solely because they are connected to the Session.
 
@@ -348,6 +380,31 @@ Transport connection lifetime **MUST NOT** determine Lease validity.
 
 A connected participant with an expired Lease **MUST NOT** retain control merely because the transport session remains open.
 
+### 18.1 Controller of Record
+
+Twin Runtime **MUST** expose the currently authoritative controller for each active Control Domain.
+
+Controller-of-record state **MUST** be derived from current Runtime authority.
+
+Transport connectivity by itself **MUST NOT** establish controller-of-record status.
+
+When control authority changes, the controller-of-record state **MUST** change accordingly and the handover **MUST** remain auditable.
+
+### 18.2 Session-wide Runtime Control Revocation
+
+Twin Runtime **MUST** support authorized Session-wide revocation of Runtime control authority.
+
+A Session-wide Runtime control revocation:
+
+- **MUST** invalidate active Twin Runtime Control Leases for that Session,
+- **MUST** cause new commands relying on those Leases to be rejected,
+- **MUST** evaluate the configured Fallback Policy,
+- **MUST** emit an audit event.
+
+Runtime control revocation is separate from a physical OEM emergency stop.
+
+Twin Runtime **MUST NOT** represent Runtime control revocation as proof that physical emergency-stop behaviour occurred unless an underlying integration explicitly confirms it.
+
 ---
 
 ## 19. Command Authorization
@@ -358,6 +415,8 @@ Before Runtime accepts a control action, the system **MUST** be able to determin
 required capability exists
 AND
 Representation Grant permits the action
+AND
+Session Policy permits the action
 AND
 Presence Mode permits the action
 AND
@@ -646,6 +705,8 @@ Runtime **MUST** emit structured events for at least:
 - Session creation,
 - Representation Grant activation,
 - Representation Grant revocation,
+- Session Policy change,
+- Session-wide Runtime control revocation,
 - Presence Mode transition,
 - Lease issue,
 - Lease renewal,
@@ -683,9 +744,13 @@ Runtime Core **MUST** emit audit events.
 
 The reference implementation **SHOULD** provide a mechanism to persist them.
 
-Tamper-evident storage, hash chains and cryptographic audit proofs are **NOT REQUIRED** for v0.1.
+Persisted Runtime audit events **SHOULD** follow a logically append-only model.
 
-They **MAY** be added in future versions.
+Previously persisted Runtime audit events **SHOULD NOT** be silently rewritten during normal operation.
+
+Cryptographic tamper-evidence is **NOT REQUIRED** for v0.1.
+
+It **MAY** be added in future versions.
 
 ---
 
@@ -702,9 +767,12 @@ Each Session **MUST** maintain its own:
 - Presence Mode,
 - Leases,
 - Representation context,
+- Session Policy context,
 - Operational State,
 - Compliance context,
 - audit events.
+
+Runtime **MUST** provide a mechanism for an authorized caller to enumerate active Sessions associated with a specific Identity Owner.
 
 v0.1 **MUST NOT** require orchestration of all Sessions into one Experience Layer.
 
@@ -856,9 +924,14 @@ At minimum they **MUST** test:
 7. TotalMersion does not silently survive Owner-control loss,
 8. declared fallback is invoked,
 9. unsupported capabilities are reported,
-10. applicable Compliance Policy restrictions are enforced,
-11. audit events represent authorization decisions,
-12. multiple Sessions may reference the same Identity Owner.
+10. applicable Session Policy restrictions are enforced,
+11. applicable Compliance Policy restrictions are enforced,
+12. Representation Grant revocation prevents dependent Runtime authority from continuing,
+13. Session-wide Runtime control revocation invalidates active Session Leases,
+14. controller-of-record reflects current Runtime authority,
+15. audit events represent authorization decisions,
+16. multiple Sessions may reference the same Identity Owner,
+17. active Sessions can be enumerated for an authorized Identity Owner lookup.
 
 ---
 
@@ -966,3 +1039,7 @@ The following rules are foundational for Twin Runtime v0.1:
 10. **One Identity Owner may participate through multiple simultaneous Twin Sessions.**
 11. **Personality, Skills and Experience remain extensible external layers.**
 12. **Software conformance is not physical safety or regulatory certification.**
+13. **Session Policy is distinct from Representation Grant, Compliance Policy and Control Lease.**
+14. **Expired or revoked Representation Grants cannot continue authorizing dependent Runtime actions.**
+15. **Controller-of-record is derived from current Runtime authority, not transport connectivity.**
+16. **Session-wide Runtime control revocation is distinct from physical OEM emergency stop.**
