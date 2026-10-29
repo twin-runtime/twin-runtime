@@ -205,7 +205,7 @@ Runtime emits structured events for authorization and control decisions.
 
 The reference architecture uses a logically append-only audit model: previously persisted Runtime events should not be silently rewritten during normal operation.
 
-Cryptographic tamper-evidence, distributed ledgers and blockchain are **not required** by Twin Runtime v0.1.
+Cryptographic tamper-evidence is **not required** by Twin Runtime v0.1.
 
 ---
 
