@@ -1319,8 +1319,6 @@ Milliseconds vs microseconds vs nanoseconds.
 
 Append-only file, database, event store or pluggable interface.
 
-No blockchain or distributed-ledger mechanism is required by this RFC.
-
 ### Command deduplication
 
 Whether `command_id` is mandatory for every realtime control message.
