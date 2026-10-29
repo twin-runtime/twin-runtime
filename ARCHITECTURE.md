@@ -69,6 +69,7 @@ Compliance →  │     TWIN RUNTIME     │
 Provider      │                      │
               │ Deployment Context   │
               │ Session              │
+              │ Session Policy       │
               │ Presence Mode        │
               │ Control Leases       │
               │ Fallback Policies    │
@@ -146,6 +147,28 @@ A Representation Grant does not automatically grant control of a robot.
 A valid Control Lease must be issued separately.
 
 A Representation Grant is a technical authorization artifact and is not, by itself, a replacement for the underlying legal agreement, consent or commercial license.
+
+### 6.1 Session Policy
+
+A Session Policy defines Runtime-level permissions and restrictions for a specific Session.
+
+It is separate from:
+
+- the Representation Grant, which defines representation authority,
+- the Compliance Policy, which expresses externally supplied regulatory constraints,
+- the Control Lease, which grants temporary control authority.
+
+A Session Policy may define:
+
+- prohibited actions,
+- autonomy limits,
+- required Identity Owner approval for selected actions,
+- permitted fallback behaviour,
+- Control Domain restrictions,
+- observation or recording permissions,
+- other Session-specific operating constraints.
+
+Session Policy is a technical Runtime policy. It does not replace legal agreements, Marketplace policy or applicable law.
 
 ---
 
@@ -344,6 +367,21 @@ A Control Lease must conceptually support:
 
 An expired or revoked Lease must no longer authorize new commands.
 
+### 10.1 Controller of Record
+
+Twin Runtime must expose the currently authoritative Controller for each active Control Domain.
+
+Example:
+
+```text
+conversation → Identity Owner
+gesture      → Identity Owner
+mobility     → AI
+navigation   → AI
+```
+
+Controller-of-record information must be derived from current Runtime authority and must not rely only on transport connectivity.
+
 ---
 
 ## 11. Command Authorization Model
@@ -356,6 +394,8 @@ Conceptually, an action can proceed only if:
 Capability exists
        AND
 Representation Grant permits it
+       AND
+Session Policy permits it
        AND
 Presence Mode permits it
        AND
@@ -420,6 +460,32 @@ safe_stop()
 but the actual implementation is supplied by the robot integration or OEM stack.
 
 Twin Runtime cannot guarantee enforcement if an integration bypasses the Edge Enforcement Agent or fails to implement required hooks.
+
+### 13.1 Runtime Control Revocation
+
+Twin Runtime must support immediate revocation of Runtime control authority for a Session.
+
+An authorized Session-wide revocation invalidates active Twin Runtime Control Leases for that Session.
+
+Conceptually:
+
+```text
+Runtime control revoke
+        ↓
+active Control Leases invalidated
+        ↓
+new commands rejected
+        ↓
+configured fallback evaluated
+        ↓
+audit event emitted
+```
+
+This mechanism is separate from the physical OEM emergency stop.
+
+Revocation or expiration of a Representation Grant must invalidate Runtime authority that depends on that Grant.
+
+An existing Control Lease must not continue authorizing representation after its underlying Representation Grant is no longer valid.
 
 ---
 
@@ -625,6 +691,8 @@ Twin Runtime must not claim physical execution unless the underlying integration
 
 Tamper-evident audit storage is not required in v0.1 architecture and may be added later.
 
+Runtime audit persistence should be logically append-only: previously recorded Runtime events should not be silently rewritten during normal operation.
+
 ---
 
 ## 20. MultiPresence
@@ -657,6 +725,10 @@ The architecture must simply not assume:
 ```text
 one Identity Owner = one Twin = one Session
 ```
+
+Runtime must allow an Identity Owner or another authorized system to enumerate the active Sessions associated with that Identity Owner.
+
+This does not require global orchestration, shared memory or an Experience Layer.
 
 ---
 
