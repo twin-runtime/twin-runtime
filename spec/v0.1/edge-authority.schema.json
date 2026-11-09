@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:twin-runtime:schema:v0.1:edge-authority",
+  "title": "Twin Runtime v0.1 Edge Authority Control Messages (proposed)",
+  "description": "Wire shapes only. Transport authentication, epoch binding, ordered fencing, trust, deduplication and expiry enforcement are stateful and must be implemented by Core/Edge.",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "edge.register"
+        },
+        "edge_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "edge_boot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "supported_control_domains": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "edge_id",
+        "edge_boot_id",
+        "supported_control_domains"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "edge.authority_install"
+        },
+        "edge_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "edge_boot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "control_domain": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "installation_sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "lease_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "controller_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lease_valid_until": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "max_local_ttl_ms": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "kind",
+        "edge_id",
+        "edge_boot_id",
+        "session_id",
+        "control_domain",
+        "generation",
+        "installation_sequence",
+        "lease_id",
+        "controller_id",
+        "lease_valid_until",
+        "max_local_ttl_ms"
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "edge.authority_revoke"
+        },
+        "edge_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "edge_boot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "control_domain": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "installation_sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "kind",
+        "edge_id",
+        "edge_boot_id",
+        "session_id",
+        "control_domain",
+        "generation",
+        "installation_sequence",
+        "reason"
+      ]
+    }
+  ]
+}
