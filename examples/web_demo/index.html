@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="Local interactive demo of Twin Runtime Core + Edge. Simulation only, not a physical robot.">
+  <title>Twin Runtime | Simulated Live Demo</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script defer src="/app.js"></script>
+</head>
+<body>
+  <div class="ambient ambient--left" aria-hidden="true"></div>
+  <div class="ambient ambient--right" aria-hidden="true"></div>
+  <div class="shell">
+    <header class="topbar">
+      <div class="identity">
+        <div class="brand-icon" aria-hidden="true">TR</div>
+        <div class="brand-text"><strong>Twin Runtime</strong><span>Open runtime for licensed human presence</span></div>
+      </div>
+      <div class="topbar-right">
+        <span class="chip chip--neutral"><span class="chip-dot"></span> Simulated reference demo</span>
+        <span class="license">OPEN SOURCE <b>·</b> APACHE-2.0</span>
+        <a class="github" href="https://github.com/twin-runtime/twin-runtime" target="_blank" rel="noopener noreferrer" aria-label="Twin Runtime on GitHub">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M12 .9A11.1 11.1 0 0 0 8.49 22.53c.56.1.76-.24.76-.53v-1.9c-3.1.67-3.75-1.32-3.75-1.32-.5-1.27-1.22-1.61-1.22-1.61-1-.69.07-.68.07-.68 1.11.08 1.7 1.14 1.7 1.14.99 1.69 2.6 1.2 3.24.92.1-.71.39-1.2.71-1.48-2.47-.28-5.07-1.24-5.07-5.5 0-1.22.43-2.21 1.14-2.99-.11-.28-.5-1.42.11-2.96 0 0 .93-.3 3.05 1.14a10.6 10.6 0 0 1 5.55 0c2.12-1.44 3.05-1.14 3.05-1.14.61 1.54.22 2.68.11 2.96.71.78 1.14 1.77 1.14 2.99 0 4.27-2.61 5.22-5.09 5.5.4.35.76 1.02.76 2.06V22c0 .29.2.64.76.53A11.1 11.1 0 0 0 12 .9Z"/></svg>
+          GitHub <span aria-hidden="true">↗</span>
+        </a>
+      </div>
+    </header>
+
+    <section class="headline" aria-label="Demo introduction">
+      <div class="eyebrow"><span class="eyebrow-line"></span> DEVELOPER EXPERIENCE / V0.1</div>
+      <h1>Control changes hands. <span>Authority stays clear.</span></h1>
+      <p><strong>Concept UI - Simulated Twin Runtime Demo.</strong> Drive the real Python Core and Edge reference logic through a local browser. No LLM, no physical robot, and no authenticated human connection.</p>
+    </section>
+
+    <main class="dashboard">
+      <section class="panel journey" aria-labelledby="journey-title">
+        <div class="panel-title-row"><h2 id="journey-title">Demo scenario</h2><span class="mini-index">01 / FLOW</span></div>
+        <p class="panel-description">Run a full controller handover in four steps.</p>
+        <ol class="timeline" id="timeline">
+          <li class="step" data-phase="autonomous"><span class="step-marker">1</span><div><strong>Autonomous</strong><small>AI controls conversation + gesture</small></div></li>
+          <li class="step" data-phase="bridge"><span class="step-marker">2</span><div><strong>Bridge</strong><small>Owner takes gesture, AI keeps conversation</small></div></li>
+          <li class="step" data-phase="disconnect"><span class="step-marker">3</span><div><strong>Owner disconnects</strong><small>Simulated loss-of-connection signal</small></div></li>
+          <li class="step" data-phase="suspended"><span class="step-marker">4</span><div><strong>Suspended</strong><small>All new commands are denied</small></div></li>
+        </ol>
+        <div class="divider"></div>
+        <div class="section-label">SESSION ACTIONS <span>TRUSTED SIMULATION</span></div>
+        <div class="action-stack">
+          <button type="button" class="btn btn--primary" data-action="start"><span class="btn-symbol">▶</span> Start session</button>
+          <button type="button" class="btn btn--primary" data-action="join"><span class="btn-symbol">◉</span> Join as Identity Owner</button>
+          <button type="button" class="btn btn--danger" data-action="disconnect"><span class="btn-symbol">⏻</span> Simulate disconnect</button>
+          <button type="button" class="btn btn--ghost" data-action="reset"><span class="btn-symbol">↺</span> Reset demonstration</button>
+        </div>
+        <p class="small-note">Identity Owner join/disconnect are <b>simulated test signals</b>, not real authentication or presence detection.</p>
+      </section>
+
+      <section class="center-col" aria-label="Digital simulation view">
+        <div class="scene panel" id="scene">
+          <div class="scene-header">
+            <span class="viewport-label"><span class="cube" aria-hidden="true">◇</span> VIRTUAL TWIN <small>CONTROL SANDBOX</small></span>
+            <span class="chip chip--bright"><span class="chip-dot"></span> SIMULATION ONLY</span>
+          </div>
+          <div class="scene-grid" aria-hidden="true"></div>
+          <div class="scene-arch" aria-hidden="true"></div>
+          <div class="light-orb" aria-hidden="true"></div>
+          <div class="robot-wrap" id="robot" aria-label="Stylized simulated robot, not a physical robot">
+            <svg class="robot-svg" viewBox="0 0 340 390" role="img" aria-label="Illustration of a simulated humanoid" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="metal" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#E1E7FF"/><stop offset=".45" stop-color="#8A9CC0"/><stop offset="1" stop-color="#3C527D"/></linearGradient>
+                <linearGradient id="metalDark" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#6C87B8"/><stop offset=".6" stop-color="#273957"/><stop offset="1" stop-color="#0E1728"/></linearGradient>
+                <linearGradient id="face" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#162337"/><stop offset="1" stop-color="#060C19"/></linearGradient>
+                <linearGradient id="beam" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#6C83FF"/><stop offset="1" stop-color="#60E1FF"/></linearGradient>
+                <filter id="eyeGlow"><feGaussianBlur stdDeviation="3"/></filter>
+              </defs>
+              <ellipse cx="171" cy="370" rx="105" ry="12" fill="#5495FE" opacity=".12"/>
+              <g class="robot-body">
+                <path d="M138 241 L123 345 Q122 364 138 366 L155 365 L167 277 Z" fill="url(#metalDark)" stroke="#8C9BBF" stroke-width="3"/>
+                <path d="M175 277 L184 365 L202 366 Q218 362 213 344 L202 241Z" fill="url(#metalDark)" stroke="#8C9BBF" stroke-width="3"/>
+                <path d="M123 345 L157 350 157 366 120 369 Q112 362 123 345" fill="url(#metal)"/>
+                <path d="M182 351 L217 345 224 369 183 369Z" fill="url(#metal)"/>
+                <path d="M132 219 Q171 205 211 219 L205 279 Q171 297 137 279Z" fill="url(#metalDark)" stroke="#ABC3E6" stroke-width="2"/>
+                <path d="M138 226L202 226L196 257Q170 276 145 257Z" fill="url(#metal)"/>
+                <path d="M139 133 Q170 125 202 134 L225 171 212 223Q171 249 130 221 L117 171Z" fill="url(#metal)" stroke="#BED0F5" stroke-width="3"/>
+                <path d="M150 150H193L205 192 191 208 149 208 137 192Z" fill="url(#metalDark)" stroke="#8DADDB" stroke-width="2"/>
+                <rect x="157" y="164" width="29" height="4" rx="2" fill="#77E9FF" opacity=".8"/>
+                <circle cx="171" cy="184" r="13" fill="#0B1D35" stroke="#65DDF5" stroke-width="2"/><path d="M163 185L169 191 180 177" stroke="#82EFFB" stroke-width="2.5" fill="none"/>
+                <path d="M153 126L188 126 190 143 151 143Z" fill="url(#metalDark)"/>
+              </g>
+              <g class="robot-arm robot-arm-left">
+                <circle cx="121" cy="162" r="19" fill="url(#metalDark)" stroke="#A8BEE5" stroke-width="3"/>
+                <path d="M116 172L95 237 108 246 135 180Z" fill="url(#metal)" stroke="#B2C3E8" stroke-width="2"/>
+                <circle cx="102" cy="247" r="10" fill="#253A60" stroke="#88A9D5" stroke-width="3"/>
+                <path d="M96 254L83 310 104 318 113 259Z" fill="url(#metalDark)" stroke="#94ADD9" stroke-width="2"/>
+                <path d="M83 308 Q77 329 88 338 Q100 340 105 315Z" fill="url(#metal)"/>
+              </g>
+              <g class="robot-arm robot-arm-right">
+                <circle cx="222" cy="161" r="19" fill="url(#metalDark)" stroke="#A8BEE5" stroke-width="3"/>
+                <path d="M225 171L246 235 234 245 208 181Z" fill="url(#metal)" stroke="#B2C3E8" stroke-width="2"/>
+                <circle cx="240" cy="246" r="10" fill="#253A60" stroke="#88A9D5" stroke-width="3"/>
+                <path d="M234 256L247 313 266 306 252 252Z" fill="url(#metalDark)" stroke="#94ADD9" stroke-width="2"/>
+                <path d="M247 308Q254 335 268 332L267 307Z" fill="url(#metal)"/>
+              </g>
+              <g class="robot-head">
+                <path d="M137 59 Q143 31 171 30 Q203 30 207 59 L204 106Q198 123 170 128 Q143 119 138 104Z" fill="url(#metal)" stroke="#D1DFFF" stroke-width="3"/>
+                <path d="M146 62Q170 47 199 63L196 99Q184 116 169 116Q155 109 147 96Z" fill="url(#face)"/>
+                <rect x="137" y="74" width="8" height="31" rx="4" fill="#63DAF7" opacity=".8"/>
+                <rect x="201" y="74" width="8" height="31" rx="4" fill="#63DAF7" opacity=".8"/>
+                <path d="M155 80Q162 75 169 81M177 81Q184 75 190 80" stroke="#67E9FF" stroke-width="6" stroke-linecap="round" fill="none" opacity=".3" filter="url(#eyeGlow)"/>
+                <path d="M155 80Q162 75 169 81M177 81Q184 75 190 80" stroke="#7DEEFF" stroke-width="3" stroke-linecap="round" fill="none"/>
+                <path d="M167 101 Q172 104 177 101" stroke="#7FC7E6" stroke-width="2" fill="none"/>
+                <path d="M145 62Q170 44 199 62" stroke="#A7D9FF" stroke-width="2" fill="none" opacity=".9"/>
+              </g>
+            </svg>
+          </div>
+          <div class="scene-vertical-legend" aria-hidden="true">SIMULATED ENVIRONMENT · NO REAL OEM</div>
+          <div class="caption-speech" id="scene-caption"><span class="wave-icon" aria-hidden="true">◍</span><span id="scene-line">Ready to start a simulated session.</span></div>
+        </div>
+
+        <div class="modebar panel">
+          <div class="modebar-title"><small>PRESENCE MODE</small><strong id="mode-value">Standby</strong></div>
+          <div class="mode-pills" aria-label="Mode transitions">
+            <span class="mode-pill" id="pill-autonomous">Autonomous</span>
+            <span class="mode-chevron">›</span>
+            <span class="mode-pill" id="pill-bridge">Bridge</span>
+            <span class="mode-chevron">›</span>
+            <span class="mode-pill" id="pill-suspended">Suspended</span>
+          </div>
+        </div>
+        <div class="panel sandbox">
+          <div class="panel-title-row"><h2>Command sandbox</h2><span class="mini-index">EDGE CHECKS</span></div>
+          <div class="sandbox-actions">
+            <button type="button" class="btn btn--mini" data-action="ai_speak">AI speaks</button>
+            <button type="button" class="btn btn--mini" data-action="ai_wave">AI waves</button>
+            <button type="button" class="btn btn--mini" data-action="owner_wave">Owner waves</button>
+            <button type="button" class="btn btn--mini btn--outline" data-action="stale_ai_wave">Test old AI lease</button>
+            <button type="button" class="btn btn--mini btn--outline" data-action="stale_owner_wave">Test disconnected owner</button>
+          </div>
+          <div class="result-line" id="command-result" aria-live="polite"><span class="result-dot"></span><span>Select a scenario step, then send a simulated command.</span></div>
+        </div>
+      </section>
+
+      <section class="right-col" aria-label="Live runtime state and audit">
+        <div class="panel overview">
+          <div class="panel-title-row"><h2>Runtime state</h2><span class="mini-index">LIVE · LOCAL</span></div>
+          <div class="kv"><span>Session</span><strong id="session-status">Ready</strong></div>
+          <div class="kv"><span>Presence mode</span><strong id="presence-mode">None</strong></div>
+          <div class="kv"><span>Representation Grant</span><strong class="mono mono-small">grant-demo</strong></div>
+          <div class="kv"><span>Local Edge</span><strong class="good"><span class="status-led"></span> Connected*</strong></div>
+          <p class="asterisk">*Connected = Core and Edge objects in the same local Python process.</p>
+        </div>
+        <div class="panel authority">
+          <div class="panel-title-row"><h2>Control authority</h2><span class="mini-index">LEASES</span></div>
+          <div class="domain-card">
+            <div><div class="domain-label">◉ <span>Conversation</span></div><small id="domain-conversation-gen">Generation -</small></div>
+            <span class="controller" id="domain-conversation">None</span>
+          </div>
+          <div class="domain-card">
+            <div><div class="domain-label">✳ <span>Gesture</span></div><small id="domain-gesture-gen">Generation -</small></div>
+            <span class="controller" id="domain-gesture">None</span>
+          </div>
+          <div class="rule-note"><span class="shield">✓</span><span>At most one active controller per domain. Edge independently rejects stale authority.</span></div>
+        </div>
+        <div class="panel event-panel">
+          <div class="panel-title-row"><h2>Core audit</h2><span class="mini-index">SQLITE · ORDERED</span></div>
+          <div class="event-list" id="audit-events" role="log" aria-live="polite"></div>
+          <div class="audit-footer">Core events only. Command checks are shown separately below.</div>
+        </div>
+        <div class="panel check-panel">
+          <div class="panel-title-row"><h2>Local command checks</h2><span class="mini-index">EDGE · MEMORY</span></div>
+          <div class="check-list" id="command-checks"><p class="muted">No commands tested yet.</p></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span><strong>LOCAL DEVELOPER DEMO</strong> · Core + Edge references · No physical safety or real authentication</span>
+      <a href="https://github.com/twin-runtime/twin-runtime" target="_blank" rel="noopener noreferrer">github.com/twin-runtime/twin-runtime ↗</a>
+    </footer>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
