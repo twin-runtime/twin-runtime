@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:twin-runtime:schema:v0.1:session-policy",
+  "title": "Twin Runtime v0.1 session-policy (reference draft)",
+  "description": "Versioned Session Policy: explicit controller authorization per mode and domain. Undefined fallback = denied.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "policy_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "active",
+        "inactive"
+      ]
+    },
+    "controller_authorizations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "controller_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "allowed_presence_modes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "autonomous",
+                "bridge",
+                "totalmersion"
+              ]
+            },
+            "uniqueItems": true,
+            "minItems": 1
+          },
+          "allowed_control_domains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true,
+            "minItems": 1
+          }
+        },
+        "required": [
+          "controller_id",
+          "allowed_presence_modes",
+          "allowed_control_domains"
+        ]
+      },
+      "minItems": 1
+    },
+    "fallback_autonomous_allowed": {
+      "type": "boolean"
+    },
+    "human_liveness_timeout_ms": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    }
+  },
+  "required": [
+    "policy_id",
+    "session_id",
+    "version",
+    "status",
+    "controller_authorizations",
+    "fallback_autonomous_allowed"
+  ]
+}

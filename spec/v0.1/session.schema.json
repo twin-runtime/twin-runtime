@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:twin-runtime:schema:v0.1:session",
+  "title": "Twin Runtime v0.1 session (reference draft)",
+  "description": "Presence Mode is non-null iff Session is active; ready/active Sessions require versioned policies.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "owner_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "representation_subject_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "edge_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "session_status": {
+      "enum": [
+        "created",
+        "ready",
+        "active",
+        "suspended",
+        "ended"
+      ]
+    },
+    "presence_mode": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "autonomous",
+            "bridge",
+            "totalmersion"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "operational_state": {
+      "type": "string",
+      "minLength": 1
+    },
+    "representation_grant_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true,
+      "minItems": 1
+    },
+    "session_policy_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "session_policy_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "compliance_policy_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "compliance_policy_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "session_id",
+    "owner_id",
+    "representation_subject_id",
+    "edge_id",
+    "session_status",
+    "presence_mode",
+    "operational_state",
+    "representation_grant_ids",
+    "created_at"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "session_status": {
+            "const": "active"
+          }
+        },
+        "required": [
+          "session_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "presence_mode": {
+            "type": "string",
+            "enum": [
+              "autonomous",
+              "bridge",
+              "totalmersion"
+            ]
+          }
+        },
+        "required": [
+          "session_policy_id",
+          "session_policy_version",
+          "compliance_policy_id",
+          "compliance_policy_version"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "session_status": {
+            "enum": [
+              "created",
+              "ready",
+              "suspended",
+              "ended"
+            ]
+          }
+        },
+        "required": [
+          "session_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "presence_mode": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "session_status": {
+            "const": "ready"
+          }
+        },
+        "required": [
+          "session_status"
+        ]
+      },
+      "then": {
+        "required": [
+          "session_policy_id",
+          "session_policy_version",
+          "compliance_policy_id",
+          "compliance_policy_version"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:twin-runtime:schema:v0.1:runtime-event",
+  "title": "Twin Runtime v0.1 runtime-event (reference draft)",
+  "description": "Minimal append-only Session event for replay/audit; transport/cryptographic guarantees deferred.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "event_type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "session_sequence": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "correlation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "lease_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "grant_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "controller_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "control_domain": {
+      "type": "string",
+      "minLength": 1
+    },
+    "session_policy_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "data": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "event_id",
+    "event_type",
+    "occurred_at",
+    "session_id",
+    "session_sequence",
+    "correlation_id",
+    "data"
+  ]
+}

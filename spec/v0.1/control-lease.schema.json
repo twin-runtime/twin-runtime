@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:twin-runtime:schema:v0.1:control-lease",
+  "title": "Twin Runtime v0.1 control-lease (reference draft)",
+  "description": "Persistent Core authority state; cross-record authorization and Edge synchronization are runtime rules, not JSON Schema rules.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "lease_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "representation_grant_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "controller_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "control_domain": {
+      "type": "string",
+      "minLength": 1
+    },
+    "issued_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "valid_until": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "enum": [
+        "active",
+        "revoked",
+        "expired",
+        "terminated"
+      ]
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "installation_sequence": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "edge_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "edge_boot_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "max_local_ttl_ms": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    }
+  },
+  "required": [
+    "lease_id",
+    "session_id",
+    "representation_grant_id",
+    "controller_id",
+    "control_domain",
+    "issued_at",
+    "valid_until",
+    "status",
+    "generation",
+    "installation_sequence",
+    "edge_id",
+    "edge_boot_id",
+    "max_local_ttl_ms"
+  ]
+}

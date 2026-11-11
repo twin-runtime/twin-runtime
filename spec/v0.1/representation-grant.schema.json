@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:twin-runtime:schema:v0.1:representation-grant",
+  "title": "Twin Runtime v0.1 representation-grant (reference draft)",
+  "description": "Technical representation scope only. Caller must be trusted local provisioning; schema validity does not confer authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "grant_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "provider_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "owner_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "authorized_subject": {
+      "type": "string",
+      "minLength": 1
+    },
+    "valid_from": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "valid_until": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "allowed_presence_modes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "autonomous",
+          "bridge",
+          "totalmersion"
+        ]
+      },
+      "uniqueItems": true,
+      "minItems": 1
+    },
+    "allowed_control_domains": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true,
+      "minItems": 1
+    },
+    "status": {
+      "enum": [
+        "active",
+        "revoked",
+        "expired",
+        "invalid"
+      ]
+    },
+    "restrictions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {},
+      "required": []
+    },
+    "authorization_reference": {
+      "type": "string",
+      "minLength": 1
+    },
+    "authorization_version": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "grant_id",
+    "provider_id",
+    "owner_id",
+    "authorized_subject",
+    "valid_from",
+    "valid_until",
+    "allowed_presence_modes",
+    "allowed_control_domains",
+    "status",
+    "restrictions"
+  ]
+}

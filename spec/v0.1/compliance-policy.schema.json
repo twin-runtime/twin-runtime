@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:twin-runtime:schema:v0.1:compliance-policy",
+  "title": "Twin Runtime v0.1 compliance-policy (reference draft)",
+  "description": "Normalized external technical compliance scope. Does not itself determine applicable law.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "policy_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "active",
+        "inactive"
+      ]
+    },
+    "allowed_presence_modes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "autonomous",
+          "bridge",
+          "totalmersion"
+        ]
+      },
+      "uniqueItems": true,
+      "minItems": 1
+    },
+    "allowed_control_domains": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true,
+      "minItems": 1
+    }
+  },
+  "required": [
+    "policy_id",
+    "session_id",
+    "version",
+    "status",
+    "allowed_presence_modes",
+    "allowed_control_domains"
+  ]
+}
