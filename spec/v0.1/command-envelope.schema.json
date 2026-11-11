@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:twin-runtime:schema:v0.1:command-envelope",
+  "title": "Twin Runtime v0.1 Command Envelope (draft)",
+  "description": "Transport-supplied authenticated identity and installed authority, not the payload, determine control authorization.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "command_id",
+    "session_id",
+    "controller_id",
+    "control_domain",
+    "lease_id",
+    "lease_generation",
+    "issued_at"
+  ],
+  "properties": {
+    "command_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "controller_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "control_domain": {
+      "type": "string",
+      "minLength": 1
+    },
+    "lease_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "lease_generation": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "issued_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "payload": {
+      "type": "object"
+    },
+    "payload_reference": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "oneOf": [
+    {
+      "required": [
+        "payload"
+      ]
+    },
+    {
+      "required": [
+        "payload_reference"
+      ]
+    }
+  ]
+}

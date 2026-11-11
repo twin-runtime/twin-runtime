@@ -1,6 +1,7 @@
 """Regression tests for the public Edge message contract and fencing rule."""
 import json
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 from jsonschema import Draft202012Validator, FormatChecker
@@ -17,7 +18,7 @@ def install(generation=11, sequence=1, lease="lease-b", controller="human-1", bo
                 session_id="session-1", control_domain=domain, lease_id=lease,
                 controller_id=controller, generation=generation,
                 installation_sequence=sequence,
-                lease_valid_until="2026-11-09T16:00:00Z", max_local_ttl_ms=1500)
+                lease_valid_until="2099-11-09T16:00:00Z", max_local_ttl_ms=1500)
 
 
 def revoke(generation=12, sequence=1, boot="boot-1"):
@@ -66,7 +67,7 @@ class TestSchema(unittest.TestCase):
 
 class TestEdgeFencing(unittest.TestCase):
     def setUp(self):
-        self.edge = EdgeFenceState("edge-1", "boot-1")
+        self.edge = EdgeFenceState("edge-1", "boot-1", supported_control_domains=("conversation", "gesture"), trusted_wall_clock=lambda: datetime(2026, 11, 9, 15, 0, tzinfo=timezone.utc))
 
     def test_stale_installation_after_revocation_rejected(self):
         self.assertTrue(self.edge.accept_from_authenticated_core(install(11, 1)))
@@ -95,7 +96,7 @@ class TestEdgeFencing(unittest.TestCase):
 
     def test_reboot_requires_new_epoch(self):
         self.assertTrue(self.edge.accept_from_authenticated_core(install(11, 1)))
-        new_edge = EdgeFenceState("edge-1", "boot-2")
+        new_edge = EdgeFenceState("edge-1", "boot-2", supported_control_domains=("conversation", "gesture"), trusted_wall_clock=lambda: datetime(2026, 11, 9, 15, 0, tzinfo=timezone.utc))
         self.assertFalse(new_edge.accept_from_authenticated_core(install(11, 1, boot="boot-1")))
         # Core is responsible for fencing previous epoch before issuing a fresh generation.
         self.assertTrue(new_edge.accept_from_authenticated_core(install(12, 1, lease="lease-c", boot="boot-2")))
