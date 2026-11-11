@@ -2,7 +2,7 @@
 
 **Open runtime for licensed human presence across AI agents, digital representations and physical robots.**
 
-> Status: **Pre-alpha / architecture and specification phase**
+> Status: **Pre-alpha / experimental reference implementation**
 
 Twin Runtime is an open-source interoperability and control layer for systems in which a specific human or organization is represented through AI, digital Twins or physical robots.
 
@@ -12,6 +12,53 @@ The project focuses on one problem:
 
 Twin Runtime is licensed under **Apache-2.0**.
 
+## Try the live demo locally
+
+The interactive browser demo uses a **real local Python Runtime Core and Edge reference implementation**, not a static mockup. It simulates a handover from Autonomous AI control to a human Identity Owner and suspends the Session after a simulated disconnect.
+
+**Requirements:** Python 3.11 or newer. No physical robot, LLM API key, Twin.rent account or commercial service is required.
+
+1. Select **Code > Download ZIP** on GitHub and extract it, or clone the repository.
+2. Open a terminal in the **repository root**, the folder containing `requirements-tests.txt`. With **Download ZIP**, that folder is normally named **`twin-runtime-main`**. With `git clone`, it is usually **`twin-runtime`**.
+3. Create a private Python virtual environment, install test dependencies, then run the demo:
+
+**Windows (PowerShell):**
+
+```powershell
+py -3 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements-tests.txt
+.\.venv\Scripts\python.exe -m examples.demo_web --port 8765
+```
+
+**macOS / Linux:**
+
+```bash
+python3 -m venv .venv
+./.venv/bin/python -m pip install -r requirements-tests.txt
+./.venv/bin/python -m examples.demo_web --port 8765
+```
+
+On Debian/Ubuntu, if `python3 -m venv .venv` reports that `ensurepip` is unavailable, install the distribution's `python3-venv` package and rerun the first command. **Do not use `--break-system-packages`.**
+
+Open **http://127.0.0.1:8765** on the **same computer** and click **Start session**. Try **Join as Identity Owner**, **Test old AI lease**, and **Simulate disconnect**. Press **Ctrl+C** in the terminal to stop the server.
+
+To run the automated tests from the repository root, using the same virtual environment:
+
+**Windows (PowerShell):**
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests -p 'test_*.py' -v
+```
+
+**macOS / Linux:**
+
+```bash
+./.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v
+```
+
+**Security:** This demo listens on `127.0.0.1` only. It does not implement real identity verification, user authentication, OEM safety, actual human-presence detection, or robot control. AI responses and connection events are scripted. **Do not expose the demonstration server to the internet or use it to control physical hardware.**
+
+Detailed scenario and limitations: [examples/README.md](examples/README.md).
 ---
 
 ## Why Twin Runtime
@@ -249,6 +296,8 @@ Commercial marketplace functions such as KYC, contracts, listings, bookings, pay
 - [Runtime Requirements](RUNTIME_REQUIREMENTS.md) - normative v0.1 requirements
 - [RFC-0001](rfcs/RFC-0001-session-representation-control-lease.md) - Session, Representation Grant and Control Lease model
 - [RFC-0002](rfcs/RFC-0002-identifiers-events-data-model.md) - identifiers, events and minimal data model
+- [RFC-0003](rfcs/RFC-0003-command-lease-grant-session.md) - command authority, Grant/Lease binding, Edge fencing and interruption
+- [Demo guide](examples/README.md) - local browser scenario and limitations
 - [Contributing](CONTRIBUTING.md)
 - [Security](SECURITY.md)
 - [License](LICENSE)
@@ -257,24 +306,18 @@ Commercial marketplace functions such as KYC, contracts, listings, bookings, pay
 
 ## Current Development Stage
 
-The repository currently defines the architectural and normative foundation for Twin Runtime.
+The repository includes an **experimental, single-host reference implementation** with:
 
-The next implementation steps are:
+1. versioned JSON Schemas for Core objects and Edge authority messages,
+2. a SQLite-backed Runtime Core for Session, Grant/Policy checks, Lease fencing and audit,
+3. an in-process simulated integration with no physical robot,
+4. reference Edge command acceptance and rejection logic,
+5. automated Python tests,
+6. an interactive localhost browser demo.
 
-1. normative JSON Schemas,
-2. Runtime Core reference implementation,
-3. dummy / simulated integration,
-4. Edge Enforcement reference component,
-5. conformance tests,
-6. first external robotics or transport integration.
+**Not yet implemented:** authenticated external transports and providers, production-grade access control, actual human-presence verification, robot/OEM integration or physical safety enforcement. Open interfaces and conformance are still evolving; passing tests does not establish production readiness.
 
-The initial schemas are expected to cover at least:
-
-- Session,
-- Representation Grant,
-- Session Policy,
-- Control Lease,
-- Runtime Event.
+Next milestones: make the demo easy to run and independently review, then prototype an external AI-controller adapter and one independently verifiable robotics/transport integration.
 
 ---
 

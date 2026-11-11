@@ -1,0 +1,15 @@
+# Python and local demo
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local SQLite demo state
+*.sqlite
+*.sqlite3
+
+# OS / editor artifacts
+.DS_Store
+Thumbs.db

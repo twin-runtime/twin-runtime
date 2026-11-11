@@ -1,39 +1,32 @@
 # Contributing to Twin Runtime
 
-Twin Runtime is an open-source project for connecting humans, AI systems and humanoid robots.
+Twin Runtime is an open-source project for connecting humans, AI systems and humanoid robots. We welcome contributions from independent developers, robotics companies, integrators and researchers.
 
-We welcome contributions from individual developers, robotics companies, integrators and researchers.
+## Propose a contribution
 
-## How to contribute
+**Anyone may fork the repository and open a Pull Request.** Prior collaborator access or maintainer approval is not required to submit a PR. Only maintainers decide whether and when changes are merged.
 
-Twin Runtime is currently in an early development phase.
+1. Follow the [README quick start](README.md#try-the-live-demo-locally) to run the demo and automated tests.
+2. Open an Issue for a bug or a substantial proposal, if helpful. For protocol, authorization, safety, or architecture changes, discuss the direction in an Issue **before implementation**.
+3. Fork, make a focused change, and add or update tests when behavior changes.
+4. Open a PR describing the problem, what changed, the relevant security implications, and how you tested it. Wait for maintainer review and CI results.
 
-Contributions to the official repository are currently accepted only from explicitly approved collaborators.
+Small fixes to documentation, tests, and examples can be proposed directly without preliminary discussion.
 
-Public users may read, fork and use the project under the Apache License 2.0, but Pull Request submission to the official repository is restricted at this stage.
+## Developer Certificate of Origin (DCO)
 
-Significant architectural proposals may be discussed with the maintainers before implementation.
+Contributors certify that they have the right to submit their contributions under this project's Apache-2.0 license. Add a sign-off trailer to each commit:
 
-## Pull Requests
+```bash
+git commit -s -m "fix: describe the change"
+```
 
-Approved collaborators should keep pull requests focused on one problem or feature.
-
-Significant changes to the protocol, APIs, safety model or architecture should be discussed before implementation.
-
-All accepted contributions are subject to review and automated testing.
+This creates `Signed-off-by: Your Name <your@email>` in the commit message. Read the [Developer Certificate of Origin](https://developercertificate.org/) before signing. Maintainers may request a missing sign-off before merging; DCO checks are not yet automated in CI.
 
 ## Commercial use
 
-Twin Runtime is licensed under the Apache License 2.0.
-
-You may use it commercially, including building paid integrations, adapters, products and services, subject to the terms of the license.
-
-## Developer Certificate of Origin
-
-Contributors will be required to certify that they have the right to submit their contribution under the project's license.
+Twin Runtime is licensed under Apache-2.0. You may use it commercially, including building paid integrations, adapters, products, and services, subject to the license terms. No Twin.rent account or booking is required.
 
 ## Security
 
-Do not report security vulnerabilities through public Issues or Discussions.
-
-See SECURITY.md for reporting instructions.
+Do not report vulnerabilities in public Issues, PRs, or Discussions. Follow [SECURITY.md](SECURITY.md) for private reporting.
