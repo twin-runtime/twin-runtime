@@ -145,6 +145,22 @@ class TestWebDemoHttp(unittest.TestCase):
             self.assertTrue(value['simulation'])
             self.assertEqual(value['csrf_token'], self.service.token)
 
+    def test_visual_demo_has_accepted_only_animation_and_reduced_motion_fallback(self):
+        # Static contract smoke-test; browser rendering is verified separately.
+        with urlopen(self.root + '/', timeout=3) as r:
+            html = r.read().decode()
+        with urlopen(self.root + '/styles.css', timeout=3) as r:
+            css = r.read().decode()
+        with urlopen(self.root + '/app.js', timeout=3) as r:
+            js = r.read().decode()
+        self.assertIn('id="robot-action-label"', html)
+        self.assertIn('class="robot-mouth"', html)
+        self.assertIn('if (!check || !check.accepted) return;', js)
+        self.assertIn('clearTimeout(animationTimer)', js)
+        self.assertIn('OWNER GESTURE · SIMULATED', js)
+        self.assertIn('.robot-wrap.is-waving .robot-arm-right{animation:none!important;', css)
+        self.assertIn('.robot-wrap.is-talking .robot-head{animation:none!important;', css)
+
     def test_http_start_join_disconnect_changes_real_state(self):
         with self.post('start') as r:
             self.assertEqual(json.load(r)['session']['presence_mode'], 'autonomous')
