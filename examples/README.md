@@ -10,8 +10,10 @@ python -m examples.demo_simulated_handover
 The demo runs entirely in one Python process with a temporary SQLite database.
 It shows a local trusted-admin Grant and two separate policies, an active
 Autonomous Session, an AI Control Lease, a switch to Bridge with a **new** Owner
-Lease, stale-command rejection, simulated Owner disconnect, a suspended Session,
-Edge revocation and ordered audit events. No Twin.rent Marketplace is needed.
+gesture Lease, then TotalMersion with Owner control of conversation and gesture.
+It also demonstrates stale-command rejection, simulated Owner disconnect, a
+suspended Session, Edge revocation and ordered audit events. No Twin.rent
+Marketplace is needed.
 
 **Not a production deployment.** Local calls stand in for authenticated Core
 and Controller transports. `owner_presence_confirmed=True` and
@@ -40,18 +42,23 @@ Open **http://127.0.0.1:8765** on the same computer. The local web UI calls
 real `RuntimeCore` and `EdgeFenceState` Python instances; it is **not** a
 static mockup. There is no LLM/API billing or external browser dependency.
 
-1. Click **Start session** to issue two autonomous AI Control Leases.
-2. Try **AI speaks** and **AI waves**. The Edge validates each command.
-3. Click **Join as Identity Owner**. This **simulates** a trusted presence
-   signal. Bridge mode issues new Leases: AI for conversation, Owner for gesture.
-4. Click **Test old AI lease** to observe Edge reject the stale generation.
-5. Click **Owner waves**, then **Simulate disconnect**.
-6. Click **Test disconnected owner** to see command rejection; the Session
-   is suspended, the Core has revoked Leases, and Audit shows the transition.
-7. Click **Reset demonstration** to start a fresh isolated local simulation.
+1. Click **Start session**. Autonomous gives AI control of conversation and gesture.
+2. Try **AI speaks (visual)** and **AI waves**. The Edge validates each command.
+3. Click **Join as Identity Owner**. This simulates a trusted presence
+   signal. Bridge issues new Leases: AI for conversation, Owner for gesture.
+4. Click **Test old AI gesture lease** (denied), then **Owner waves** (accepted).
+5. Click **Enter TotalMersion**. New Leases put Owner in charge of both
+   conversation and gesture. Try **Owner speaks (visual)** and **Owner waves**.
+6. Click **Test old AI conversation lease** to see the previous AI controller
+   denied by Edge after the takeover.
+7. **Separate safety test:** click **Simulate disconnect** from Bridge or
+   TotalMersion. Session becomes Suspended (a status, **not** another Presence
+   Mode). Click **Test disconnected owner** to observe rejection and Audit.
+8. Click **Reset demonstration** for a new isolated local simulation.
 
 The stylized robot illustration performs a short visual wave or nod only when
-an Edge command check is accepted. It is **not** a robotics physics simulator,
+an Edge command check is accepted. Scripted speech is visual only, without
+sound or a live voice model. It is **not** a robotics physics simulator,
 rendering of a real OEM robot, or proof of hardware execution.
 
 **Important limits:** The server deliberately binds only to `127.0.0.1` and
