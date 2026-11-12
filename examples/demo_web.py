@@ -29,8 +29,9 @@ from reference.runtime_core import CoreDenied, RuntimeCore
 
 _ASSETS = Path(__file__).resolve().parent / "web_demo"
 _ACTIONS = frozenset({
-    "start", "join", "disconnect", "ai_speak", "ai_wave",
-    "owner_wave", "stale_ai_wave", "stale_owner_wave", "reset",
+    "start", "join", "totalmersion", "disconnect", "ai_speak", "ai_wave",
+    "owner_speak", "owner_wave", "stale_ai_wave", "stale_ai_speak",
+    "stale_owner_wave", "reset",
 })
 
 
@@ -80,6 +81,7 @@ class DemoState:
         self.grant_id = "grant-demo"
         self.leases: dict[str, dict] = {}
         self.stale_ai_gesture: dict | None = None
+        self.stale_ai_conversation: dict | None = None
         self.stale_owner_gesture: dict | None = None
         self.command_checks: list[dict] = []
         self.last_command: dict | None = None
@@ -100,7 +102,7 @@ class DemoState:
             "authorized_subject": "simulation-twin",
             "valid_from": stamp(now - timedelta(minutes=1)),
             "valid_until": stamp(now + timedelta(hours=2)),
-            "allowed_presence_modes": ["autonomous", "bridge"],
+            "allowed_presence_modes": ["autonomous", "bridge", "totalmersion"],
             "allowed_control_domains": ["conversation", "gesture"],
             "status": "active",
             "restrictions": {},
@@ -118,6 +120,8 @@ class DemoState:
                  "allowed_control_domains": ["conversation", "gesture"]},
                 {"controller_id": "human-owner", "allowed_presence_modes": ["bridge"],
                  "allowed_control_domains": ["gesture"]},
+                {"controller_id": "human-owner", "allowed_presence_modes": ["totalmersion"],
+                 "allowed_control_domains": ["conversation", "gesture"]},
             ],
             "fallback_autonomous_allowed": False,
             "human_liveness_timeout_ms": 2000,
@@ -126,7 +130,7 @@ class DemoState:
             "session_id": self.session_id,
             "version": "1",
             "status": "active",
-            "allowed_presence_modes": ["autonomous", "bridge"],
+            "allowed_presence_modes": ["autonomous", "bridge", "totalmersion"],
             "allowed_control_domains": ["conversation", "gesture"],
         })
         self.core.prepare_session(self.session_id)
@@ -203,24 +207,47 @@ class DemoState:
                 }
                 self.stale_owner_gesture = self.leases["gesture"]
                 self._sync_edge()
-            elif action == "disconnect":
+            elif action == "totalmersion":
                 if status["session_status"] != "active" or status["presence_mode"] != "bridge":
                     raise CoreDenied("demo_not_bridge")
-                # This click SIMULATES a trusted disconnect notification.
+                # Click simulates continued owner presence, not actual authentication.
+                self.stale_ai_conversation = self.leases["conversation"]
+                self.core.change_mode(self.session_id, "totalmersion", owner_presence_confirmed=True)
+                self.leases = {
+                    "conversation": self._lease("human-owner", "conversation"),
+                    "gesture": self._lease("human-owner", "gesture"),
+                }
+                self.stale_owner_gesture = self.leases["gesture"]
+                self._sync_edge()
+            elif action == "disconnect":
+                if (status["session_status"] != "active" or
+                        status["presence_mode"] not in ("bridge", "totalmersion")):
+                    raise CoreDenied("demo_no_live_owner_mode")
+                # Separate safety test: simulated trusted disconnect notification.
                 self.core.owner_disconnected(self.session_id)
                 self._sync_edge()
             elif action == "ai_speak":
+                if (status["session_status"] != "active" or
+                        status["presence_mode"] not in ("autonomous", "bridge")):
+                    raise CoreDenied("demo_ai_conversation_not_authorized")
                 self._command(self.leases.get("conversation"), "speak", "AI says hello")
             elif action == "ai_wave":
-                if status["presence_mode"] != "autonomous":
+                if status["session_status"] != "active" or status["presence_mode"] != "autonomous":
                     raise CoreDenied("demo_not_autonomous")
                 self._command(self.leases.get("gesture"), "wave", "AI waves")
+            elif action == "owner_speak":
+                if status["session_status"] != "active" or status["presence_mode"] != "totalmersion":
+                    raise CoreDenied("demo_not_totalmersion")
+                self._command(self.leases.get("conversation"), "speak", "Owner speaks (visual only)")
             elif action == "owner_wave":
-                if status["presence_mode"] != "bridge":
-                    raise CoreDenied("demo_not_bridge")
+                if (status["session_status"] != "active" or
+                        status["presence_mode"] not in ("bridge", "totalmersion")):
+                    raise CoreDenied("demo_no_owner_gesture")
                 self._command(self.leases.get("gesture"), "wave", "Owner waves")
             elif action == "stale_ai_wave":
-                self._command(self.stale_ai_gesture, "wave", "Old AI lease tries to wave")
+                self._command(self.stale_ai_gesture, "wave", "Old AI gesture lease tries to wave")
+            elif action == "stale_ai_speak":
+                self._command(self.stale_ai_conversation, "speak", "Old AI conversation lease tries to speak")
             elif action == "stale_owner_wave":
                 self._command(self.stale_owner_gesture, "wave", "Disconnected owner tries to wave")
             return self.snapshot()
