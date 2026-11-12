@@ -217,6 +217,14 @@ class TestWebDemoHttp(unittest.TestCase):
         self.assertIn('OWNER GESTURE · SIMULATED', js)
         self.assertIn('OWNER SPEECH · SIMULATED', js)
         self.assertIn('id="pill-totalmersion"', html)
+        self.assertIn('id="run-full-scenario"', html)
+        self.assertIn('id="scenario-progress"', html)
+        self.assertIn('role="status"', html)
+        self.assertIn('const fullScenarioSteps = [', js)
+        self.assertIn('verifyScenarioStep(step, state)', js)
+        self.assertIn('byId("run-full-scenario").addEventListener("click", runFullScenario)', js)
+        self.assertIn('isBusy = true;', js)
+        self.assertIn('if (!isBusy) loadState()', js)
         self.assertIn('data-action="totalmersion"', html)
         self.assertNotIn('id="pill-suspended"', html)
         self.assertIn('.robot-wrap.is-waving .robot-arm-right{animation:none!important;', css)
@@ -245,6 +253,34 @@ class TestWebDemoHttp(unittest.TestCase):
             self.assertTrue(json.load(response)['last_command']['accepted'])
         with self.post('disconnect') as response:
             self.assertEqual(json.load(response)['session']['session_status'], 'suspended')
+
+    def test_http_guided_scenario_uses_real_core_edge_actions(self):
+        # Reproduce the one-click browser sequence against the same HTTP endpoints.
+        steps = [
+            ('reset', 'ready', None, None),
+            ('start', 'active', 'autonomous', None),
+            ('ai_wave', 'active', 'autonomous', (True, 'accepted')),
+            ('join', 'active', 'bridge', None),
+            ('owner_wave', 'active', 'bridge', (True, 'accepted')),
+            ('totalmersion', 'active', 'totalmersion', None),
+            ('owner_speak', 'active', 'totalmersion', (True, 'accepted')),
+            ('stale_ai_speak', 'active', 'totalmersion', (False, 'stale_generation')),
+            ('disconnect', 'suspended', None, None),
+            ('stale_owner_wave', 'suspended', None, (False, 'revoked')),
+        ]
+        for action, status, mode, check in steps:
+            with self.subTest(action=action), self.post(action) as response:
+                snapshot = json.load(response)
+                self.assertEqual(snapshot['session']['session_status'], status)
+                self.assertEqual(snapshot['session']['presence_mode'], mode)
+                if check is not None:
+                    self.assertEqual(
+                        (snapshot['last_command']['accepted'], snapshot['last_command']['reason']),
+                        check,
+                    )
+        self.assertFalse(any(x['edge_authorized_now'] for x in snapshot['domains']))
+        self.assertTrue(any(e['event_type'] == 'fallback.triggered' for e in snapshot['audit']))
+        self.assertEqual(snapshot['command_checks'][0]['label'], 'Disconnected owner tries to wave')
 
     def test_http_rejects_missing_token_cross_origin_bad_actions_and_json(self):
         for override in ({'X-Demo-Token': 'invalid'}, {'Origin': 'http://evil.invalid'}):

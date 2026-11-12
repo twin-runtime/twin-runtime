@@ -38,6 +38,10 @@
       <section class="panel journey" aria-labelledby="journey-title">
         <div class="panel-title-row"><h2 id="journey-title">Demo scenario</h2><span class="mini-index">01 / FLOW</span></div>
         <p class="panel-description">Three Presence Modes. Disconnect is a separate safety test.</p>
+        <div class="guided-demo">
+          <button type="button" class="btn btn--guided" id="run-full-scenario"><span class="btn-symbol">▶</span> Run Full Scenario</button>
+          <p id="scenario-progress" class="scenario-progress" role="status" aria-live="polite">One click resets the demo, then runs three modes and the safety checks.</p>
+        </div>
         <ol class="timeline" id="timeline">
           <li class="step" data-phase="autonomous"><span class="step-marker">1</span><div><strong>Autonomous</strong><small>AI holds conversation + gesture</small></div></li>
           <li class="step" data-phase="bridge"><span class="step-marker">2</span><div><strong>Bridge</strong><small>Owner takes gesture, AI keeps conversation</small></div></li>
