@@ -47,7 +47,7 @@ A command timestamp from the sender MUST NOT be used as proof of freshness. The 
 
 Each v0.1 `ControlLease` MUST contain exactly one `representation_grant_id`. It MUST reference a Grant already associated with the Session. A Lease MUST NOT outlive its supporting Grant.
 
-`Session` MUST bind to the represented entity with `representation_subject_id` before entering `ready` or `active`. `RepresentationGrant.authorized_subject` MUST identify that representation subject, **not** the Controller. No implicit substitution or delegation between these roles is allowed.
+`Session` MUST bind to the represented entity with `representation_subject_id` before entering `ready` or `active`. `RepresentationGrant.authorized_subject` MUST identify that logical representation subject, **not** the Controller, physical Edge/device or commercial context. `RepresentationGrant.owner_id` identifies the represented human or organization, not automatically the legal rights holder. No implicit substitution or delegation between these roles is allowed. See [Identity and Grant Contract](../docs/IDENTITY_GRANT_CONTRACT.md).
 
 For the v0.1 reference implementation, define at least these machine-interpretable technical Grant constraints:
 
@@ -65,7 +65,7 @@ allowed_control_domains[]  # proposed required technical scope for Lease issuanc
 
 Unknown keys in authorization-relevant `restrictions` MUST block Lease issuance unless the Core has an explicit validator for their semantics. Non-authoritative `extensions` MAY be retained or ignored but MUST NOT override the above rules. The reference v0.1 schema MUST use a closed vocabulary for enforceable authorization restrictions. No claim about the legal sufficiency of underlying consent is implied by this technical check.
 
-**v0.1 trust boundary:** the reference Core accepts Grants provisioned by its configured trusted local administrator, or by an administrator-configured trusted provider with an explicit validation mapping. An arbitrary client-provided Grant is NOT trusted merely because it passes JSON Schema. The reference implementation MAY initially support only trusted local provisioning; third-party federation, signed credentials and external trust discovery are deferred.
+**v0.1 trust boundary:** the reference Core accepts Grants provisioned by its configured trusted local administrator, or by an administrator-configured trusted provider with an explicit validation mapping. An arbitrary client-provided Grant is NOT trusted merely because it passes JSON Schema. The reference implementation MAY initially support only trusted local provisioning; third-party federation, signed credentials and external trust discovery are deferred. As implemented today, Core accepts trusted local administrative input but does **not** authenticate `provider_id` against an issuer registry or verify cryptographic Grant signatures. The presence of a nonempty `provider_id` is not evidence of trust. Controller identity and human liveness are also supplied by trusted host inputs in the simulator, not independently verified end to end.
 
 Any change to security-relevant Grant authority (scope, status, time, represented subject, issuer binding, version) MUST invalidate affected active Leases. Reissue requires a new `lease_id` and strictly greater generation. Cosmetic metadata changes need not trigger a reissue, but MUST NOT affect authorization.
 
