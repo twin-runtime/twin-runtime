@@ -118,6 +118,7 @@ function render(data) {
     reset: true,
   };
   for (const button of actions) button.disabled = isBusy || !permitted[button.dataset.action];
+  byId("run-full-scenario").disabled = isBusy;
 
   const result = byId("command-result");
   result.classList.toggle("is-accepted", Boolean(data.last_command?.accepted));
@@ -171,23 +172,28 @@ async function loadState() {
   render(await response.json());
 }
 
+async function applyAction(action) {
+  const response = await fetch("/api/action", {
+    method: "POST",
+    headers: {"Content-Type": "application/json", "X-Demo-Token": current.csrf_token},
+    body: JSON.stringify({action}),
+  });
+  const value = await response.json();
+  if (!response.ok) throw Error(value.error || "Action rejected");
+  if (action === "reset" || action === "disconnect") clearRobotAction();
+  if (["ai_speak", "ai_wave", "owner_speak", "owner_wave", "stale_ai_wave", "stale_ai_speak", "stale_owner_wave"].includes(action)) {
+    animateAccepted(value.last_command);
+  }
+  render(value);
+  return value;
+}
+
 async function runAction(action) {
   if (isBusy || !current) return;
   isBusy = true;
-  actions.forEach((b) => { b.disabled = true; });
+  render(current);
   try {
-    const response = await fetch("/api/action", {
-      method: "POST",
-      headers: {"Content-Type": "application/json", "X-Demo-Token": current.csrf_token},
-      body: JSON.stringify({action}),
-    });
-    const value = await response.json();
-    if (!response.ok) throw Error(value.error || "Action rejected");
-    if (action === "reset" || action === "disconnect") clearRobotAction();
-    if (["ai_speak", "ai_wave", "owner_speak", "owner_wave", "stale_ai_wave", "stale_ai_speak", "stale_owner_wave"].includes(action)) {
-      animateAccepted(value.last_command);
-    }
-    render(value);
+    await applyAction(action);
   } catch (error) {
     showToast("Demo action failed: " + error.message);
     try { await loadState(); } catch { /* error already visible */ }
@@ -197,7 +203,60 @@ async function runAction(action) {
   }
 }
 
+// These are the same HTTP actions as manual clicks, never a mocked replay.
+const fullScenarioSteps = [
+  {action: "reset", label: "Fresh local Core + Edge", status: "ready", delay: 350},
+  {action: "start", label: "Autonomous: AI holds both domains", mode: "autonomous", delay: 900},
+  {action: "ai_wave", label: "AI wave accepted by Edge", accepted: true, delay: 2700},
+  {action: "join", label: "Bridge: Owner takes gesture", mode: "bridge", delay: 1100},
+  {action: "owner_wave", label: "Owner wave accepted by Edge", accepted: true, delay: 2700},
+  {action: "totalmersion", label: "TotalMersion: Owner takes both domains", mode: "totalmersion", delay: 1150},
+  {action: "owner_speak", label: "Owner speech accepted (visual only)", accepted: true, delay: 2700},
+  {action: "stale_ai_speak", label: "Old AI conversation Lease denied", accepted: false, reason: "stale_generation", delay: 1500},
+  {action: "disconnect", label: "Simulated disconnect: Session suspended", status: "suspended", delay: 1300},
+  {action: "stale_owner_wave", label: "Disconnected Owner Lease denied", accepted: false, reason: "revoked", delay: 0},
+];
+
+function verifyScenarioStep(step, state) {
+  if (step.mode && state.session.presence_mode !== step.mode) {
+    throw Error(step.action + " did not enter " + step.mode);
+  }
+  if (step.status && state.session.session_status !== step.status) {
+    throw Error(step.action + " did not reach " + step.status);
+  }
+  if (step.accepted !== undefined) {
+    if (!state.last_command || state.last_command.accepted !== step.accepted ||
+        (step.reason && state.last_command.reason !== step.reason)) {
+      throw Error(step.action + " produced an unexpected Edge decision");
+    }
+  }
+}
+
+async function runFullScenario() {
+  if (isBusy || !current) return;
+  isBusy = true;
+  render(current); // Disable manual actions throughout the guided flow.
+  const progress = byId("scenario-progress");
+  try {
+    for (const [index, step] of fullScenarioSteps.entries()) {
+      progress.textContent = "Step " + (index + 1) + "/" + fullScenarioSteps.length + ": " + step.label;
+      const state = await applyAction(step.action);
+      verifyScenarioStep(step, state);
+      if (step.delay) await new Promise((resolve) => setTimeout(resolve, step.delay));
+    }
+    progress.textContent = "Complete: 3 modes, accepted commands, revoked Leases, Session suspended.";
+  } catch (error) {
+    progress.textContent = "Scenario stopped: " + error.message + ". Use Run Full Scenario to restart.";
+    showToast("Guided scenario stopped: " + error.message);
+    try { await loadState(); } catch { /* error already visible */ }
+  } finally {
+    isBusy = false;
+    if (current) render(current);
+  }
+}
+
 for (const button of actions) button.addEventListener("click", () => runAction(button.dataset.action));
+byId("run-full-scenario").addEventListener("click", runFullScenario);
 loadState().catch((error) => showToast(error.message));
 window.setInterval(() => {
   if (!isBusy) loadState().catch(() => showToast("Could not refresh local runtime state"));

@@ -42,6 +42,20 @@ Open **http://127.0.0.1:8765** on the same computer. The local web UI calls
 real `RuntimeCore` and `EdgeFenceState` Python instances; it is **not** a
 static mockup. There is no LLM/API billing or external browser dependency.
 
+**One-click walkthrough:** press **Run Full Scenario** to reset the local
+simulation and automatically drive the same HTTP actions used by the manual
+buttons: Autonomous → AI wave → Bridge → Owner wave → TotalMersion →
+Owner speech (visual only) → stale AI command denied → simulated disconnect →
+stale Owner command denied. A step counter shows progress; unexpected Core
+or Edge responses stop the walkthrough. While it runs, manual controls are
+disabled. At the end the Session is **Suspended** and Edge has **no active
+authority**. You can run it again to start a clean scenario. This is browser
+orchestration of real local Core/Edge decisions, not a video or external robot
+integration. The walkthrough can be interrupted by refreshing the page, and
+the current state can then be reset.
+
+**Manual walkthrough:**
+
 1. Click **Start session**. Autonomous gives AI control of conversation and gesture.
 2. Try **AI speaks (visual)** and **AI waves**. The Edge validates each command.
 3. Click **Join as Identity Owner**. This simulates a trusted presence
