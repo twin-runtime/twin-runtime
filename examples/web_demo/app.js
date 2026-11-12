@@ -66,19 +66,28 @@ function render(data) {
   const mode = session.presence_mode;
   const bridge = status === "active" && mode === "bridge";
   const autonomous = status === "active" && mode === "autonomous";
+  const totalmersion = status === "active" && mode === "totalmersion";
   const suspended = status === "suspended";
+  const visited = new Set(data.audit
+    .filter((event) => event.event_type === "presence_mode.changed")
+    .map((event) => event.data?.to_mode));
+  const visitedBridge = bridge || totalmersion || visited.has("bridge");
+  const visitedTotalMersion = totalmersion || visited.has("totalmersion");
   setText("session-status", titleCase(status));
   setText("presence-mode", titleCase(mode));
-  setText("mode-value", suspended ? "Suspended" : titleCase(mode || "standby"));
-  const stage = autonomous ? 0 : bridge ? 1 : suspended ? 3 : -1;
+  // Suspended is a Session status, not a fourth Presence Mode.
+  setText("mode-value", suspended ? "None (session suspended)" : titleCase(mode || "standby"));
+  const stage = autonomous ? 0 : bridge ? 1 : totalmersion ? 2 : -1;
   document.querySelectorAll(".step").forEach((el, index) => {
-    el.classList.toggle("is-done", stage >= 0 && index < stage);
-    el.classList.toggle("is-current", index === stage || (index === 2 && suspended));
+    const completed = stage >= 0 ? index < stage :
+      suspended && index < (visitedTotalMersion ? 3 : visitedBridge ? 2 : 0);
+    el.classList.toggle("is-done", completed);
+    el.classList.toggle("is-current", index === stage);
   });
   for (const [id, active, done] of [
-    ["autonomous", autonomous, bridge || suspended],
-    ["bridge", bridge, suspended],
-    ["suspended", suspended, false],
+    ["autonomous", autonomous, bridge || totalmersion || suspended],
+    ["bridge", bridge, totalmersion || (suspended && visitedBridge)],
+    ["totalmersion", totalmersion, suspended && visitedTotalMersion],
   ]) {
     const el = byId("pill-" + id);
     el.classList.toggle("is-active", active);
@@ -97,11 +106,14 @@ function render(data) {
   const permitted = {
     start: status === "ready",
     join: autonomous,
-    disconnect: bridge,
+    totalmersion: bridge,
+    disconnect: bridge || totalmersion,
     ai_speak: autonomous || bridge,
     ai_wave: autonomous,
-    owner_wave: bridge,
-    stale_ai_wave: bridge || suspended,
+    owner_speak: totalmersion,
+    owner_wave: bridge || totalmersion,
+    stale_ai_wave: bridge || totalmersion || suspended,
+    stale_ai_speak: totalmersion || (suspended && visitedTotalMersion),
     stale_owner_wave: suspended,
     reset: true,
   };
@@ -117,6 +129,7 @@ function render(data) {
     result.lastElementChild.textContent = "Select a scenario step, then send a simulated command.";
   }
   if (suspended) setText("scene-line", "Session suspended. No controller can send new accepted commands.");
+  else if (totalmersion) setText("scene-line", "TotalMersion: Owner holds conversation and gesture. Speech is visual only.");
   else if (bridge) setText("scene-line", "Bridge: Owner holds gesture; AI continues conversation.");
   else if (autonomous) setText("scene-line", "Autonomous: AI holds conversation and gesture control.");
   else setText("scene-line", "Ready to start a simulated session.");
@@ -143,7 +156,7 @@ function animateAccepted(check) {
   robot.classList.add(waving ? "is-waving" : "is-talking");
   label.textContent = waving ?
     (check.controller === "human-owner" ? "OWNER GESTURE · SIMULATED" : "AI GESTURE · SIMULATED") :
-    "AI SPEECH · SIMULATED";
+    (check.controller === "human-owner" ? "OWNER SPEECH · SIMULATED" : "AI SPEECH · SIMULATED");
   label.classList.add("is-visible");
   animationTimer = window.setTimeout(() => {
     robot.classList.remove("is-waving", "is-talking");
@@ -171,7 +184,7 @@ async function runAction(action) {
     const value = await response.json();
     if (!response.ok) throw Error(value.error || "Action rejected");
     if (action === "reset" || action === "disconnect") clearRobotAction();
-    if (["ai_speak", "ai_wave", "owner_wave", "stale_ai_wave", "stale_owner_wave"].includes(action)) {
+    if (["ai_speak", "ai_wave", "owner_speak", "owner_wave", "stale_ai_wave", "stale_ai_speak", "stale_owner_wave"].includes(action)) {
       animateAccepted(value.last_command);
     }
     render(value);
