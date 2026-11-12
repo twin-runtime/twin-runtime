@@ -2,7 +2,7 @@
 
 let current = null;
 let isBusy = false;
-let lastCheck = null;
+let animationTimer = null;
 let toastTimer = null;
 const byId = (id) => document.getElementById(id);
 const actions = document.querySelectorAll("[data-action]");
@@ -123,16 +123,33 @@ function render(data) {
   renderLog(data);
 }
 
+function clearRobotAction() {
+  if (animationTimer !== null) window.clearTimeout(animationTimer);
+  animationTimer = null;
+  byId("robot").classList.remove("is-waving", "is-talking");
+  byId("robot-action-label").classList.remove("is-visible");
+}
+
 function animateAccepted(check) {
-  if (!check || check === lastCheck) return;
-  lastCheck = check;
-  if (!check.accepted) return;
+  // Visual feedback is only triggered by an accepted Edge check. No robot is driven.
+  if (!check || !check.accepted) return;
   const robot = byId("robot");
+  const label = byId("robot-action-label");
+  if (animationTimer !== null) window.clearTimeout(animationTimer);
   robot.classList.remove("is-waving", "is-talking");
-  // Force restart only for a new, accepted demo command (never for a rejected command).
+  // Restart the CSS animation for consecutive accepted commands of the same kind.
   void robot.offsetWidth;
-  robot.classList.add(check.kind === "wave" ? "is-waving" : "is-talking");
-  window.setTimeout(() => robot.classList.remove("is-waving", "is-talking"), 2400);
+  const waving = check.kind === "wave";
+  robot.classList.add(waving ? "is-waving" : "is-talking");
+  label.textContent = waving ?
+    (check.controller === "human-owner" ? "OWNER GESTURE · SIMULATED" : "AI GESTURE · SIMULATED") :
+    "AI SPEECH · SIMULATED";
+  label.classList.add("is-visible");
+  animationTimer = window.setTimeout(() => {
+    robot.classList.remove("is-waving", "is-talking");
+    label.classList.remove("is-visible");
+    animationTimer = null;
+  }, 2600);
 }
 
 async function loadState() {
@@ -153,6 +170,7 @@ async function runAction(action) {
     });
     const value = await response.json();
     if (!response.ok) throw Error(value.error || "Action rejected");
+    if (action === "reset" || action === "disconnect") clearRobotAction();
     if (["ai_speak", "ai_wave", "owner_wave", "stale_ai_wave", "stale_owner_wave"].includes(action)) {
       animateAccepted(value.last_command);
     }
