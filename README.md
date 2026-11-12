@@ -294,6 +294,7 @@ Commercial marketplace functions such as KYC, contracts, listings, bookings, pay
 
 - [Architecture](ARCHITECTURE.md) - system boundaries and architectural model
 - [Runtime Requirements](RUNTIME_REQUIREMENTS.md) - normative v0.1 requirements
+- [Identity and Grant Contract](docs/IDENTITY_GRANT_CONTRACT.md) - `owner_id`, `authorized_subject`, provider identifiers and current trust limits
 - [RFC-0001](rfcs/RFC-0001-session-representation-control-lease.md) - Session, Representation Grant and Control Lease model
 - [RFC-0002](rfcs/RFC-0002-identifiers-events-data-model.md) - identifiers, events and minimal data model
 - [RFC-0003](rfcs/RFC-0003-command-lease-grant-session.md) - command authority, Grant/Lease binding, Edge fencing and interruption

@@ -69,7 +69,7 @@ Those are handled by later specifications or integrations.
 
 ### 4.1 Identity Owner
 
-The person or organization being represented.
+The person or organization being represented. Legal rights holders, licensors and signatories may be different parties; those legal relationships are outside Runtime Core.
 
 ```text
 IdentityOwner
@@ -105,7 +105,7 @@ Twin Runtime Core must not depend on one specific provider.
 
 ### 4.3 Representation Grant
 
-A Representation Grant states that a subject is allowed to represent an Identity Owner under defined conditions.
+A Representation Grant binds a technical representation subject (`authorized_subject`) to an Identity Owner under defined conditions. The subject identifies what representation is authorized, not which Controller may issue commands. Controller authorization is a separate Session Policy and Control Lease decision.
 
 Conceptually:
 
@@ -120,6 +120,8 @@ RepresentationGrant
     restrictions
     status
 ```
+
+The v0.1 field mapping is described in [Identity and Grant Contract](../docs/IDENTITY_GRANT_CONTRACT.md) and the schemas; `authorized_subject` equals `Session.representation_subject_id`, not `controller_id` or `twin_instance_id`.
 
 The exact serialization is defined later.
 

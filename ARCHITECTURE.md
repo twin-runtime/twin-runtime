@@ -101,7 +101,7 @@ No specific transport, robotics framework, AI provider or marketplace is a manda
 
 ## 4. Identity Owner
 
-The Identity Owner is the human or organization whose identity or presence is represented by a Twin.
+The Identity Owner is the human or organization whose identity or presence is represented by a Twin. This is not necessarily the legal rights holder, licensor, signatory or commercial customer. A company holding rights to portray a person is not automatically the Identity Owner of that person's representation.
 
 The Identity Owner is separate from:
 
@@ -118,7 +118,7 @@ This distinction is fundamental to Twin Runtime.
 
 ## 5. Representation Provider
 
-A Representation Provider supplies the technical authorization that a specific person, AI system or service may represent an Identity Owner under defined conditions.
+A Representation Provider supplies technical authorization for a specified representation subject to represent an Identity Owner under defined conditions. The subject is identified by `RepresentationGrant.authorized_subject`; this field is not the Controller identity or authorization to control.
 
 Twin.rent Marketplace may act as a Representation Provider.
 
@@ -135,14 +135,16 @@ A Representation Grant describes technical authorization to represent an Identit
 It can express:
 
 - who is represented,
-- who or what may represent them,
+- which logical representation subject is authorized (`authorized_subject`, matching the Session's `representation_subject_id`),
 - permitted context,
 - permitted Presence Modes,
 - validity period,
 - restrictions,
 - revocation status.
 
-A Representation Grant does not automatically grant control of a robot.
+A Representation Grant does not automatically grant control of a robot. Individual Controllers are authorized through the Session Policy and receive separate scoped Control Leases. The current Grant schema does not constrain Controller identity or class.
+
+For the v0.1 field mapping, namespace guidance and implemented trust limitations, see [Identity and Grant Contract](docs/IDENTITY_GRANT_CONTRACT.md).
 
 A valid Control Lease must be issued separately.
 

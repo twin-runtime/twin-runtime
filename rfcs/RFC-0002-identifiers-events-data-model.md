@@ -135,7 +135,7 @@ event_...
 
 Prefixes are for readability only.
 
-Authorization MUST NOT depend on them.
+Authorization MUST NOT depend on them. In deployments accepting Grants from multiple providers, the issuer must supply collision-resistant, deployment-unique opaque IDs for represented owners, subjects and Grants. A provider-qualified namespace is a practical convention, not proof of issuer trust or of a shared real-world identity. See [Identity and Grant Contract](../docs/IDENTITY_GRANT_CONTRACT.md).
 
 ---
 
@@ -167,6 +167,8 @@ IdentityOwner
     display_name? 
     metadata?
 ```
+
+`owner_id` identifies the person or organization whose identity/presence is represented. It is not automatically the commercial rights holder, signatory, operator or payer. A legal rights holder and represented person must not be silently conflated.
 
 Only `owner_id` is required by Runtime Core.
 
@@ -213,11 +215,14 @@ RepresentationGrantRef
     valid_from
     valid_until
     allowed_presence_modes[]
+    allowed_control_domains[]
     status
     restrictions?
     authorization_reference?
     authorization_version?
 ```
+
+`authorized_subject` is the logical technical representation subject; `Session.representation_subject_id` must match it. It is not a Controller, a booking, or a physical robot/Edge identifier. `provider_id` records issuer provenance but is not independently authenticated by the current reference Core. `authorization_reference` and `authorization_version` are optional traceability fields and are not presently used in Core authorization checks.
 
 Runtime Core may receive this from:
 
@@ -274,6 +279,8 @@ Deployment
     compliance_policy_id?
 ```
 
+`twin_instance_id` denotes an optional deployment/embodiment instance, not `RepresentationGrant.authorized_subject`; a logical representation subject may be realized on different compatible endpoints.
+
 A Deployment may contain zero or more Sessions.
 
 ---
@@ -286,6 +293,7 @@ Minimal Session record:
 Session
     session_id
     owner_id
+    representation_subject_id
     deployment_id?
     presence_mode
     operational_state
@@ -296,6 +304,8 @@ Session
     started_at?
     ended_at?
 ```
+
+`representation_subject_id` must equal the `authorized_subject` of a supporting Grant. A Session's endpoint/Edge assignment and current Controller remain distinct from that subject.
 
 Session state MUST be independently addressable.
 

@@ -98,7 +98,7 @@ A Representation Grant **MUST** provide or reference sufficient information to d
 
 - represented Identity Owner,
 - issuer / Representation Provider,
-- authorized subject or controller class,
+- technical representation subject (`authorized_subject`), distinct from the Controller,
 - validity period,
 - allowed Presence Modes,
 - applicable restrictions,
@@ -118,6 +118,10 @@ Revocation or expiration of a Representation Grant **MUST** invalidate Runtime a
 Any active Control Lease that depends on an invalid Representation Grant **MUST NOT** authorize new commands.
 
 Twin Runtime **MUST NOT** claim that a Representation Grant is itself the underlying legal contract or commercial license.
+
+For v0.1, `RepresentationGrant.authorized_subject` identifies the logical representation subject and **MUST** match the Session's `representation_subject_id`. It does **NOT** identify an authorized Controller. Controller permissions are defined by Session Policy and exercised through scoped Control Leases. Adding issuer-imposed Controller or Controller-class restrictions to Grants is a future contract change, not a feature of the current schema.
+
+`provider_id` identifies the represented issuer, but its value alone is not proof of issuer trust. The current reference implementation supports trusted local Grant provisioning and does not authenticate federated issuers. See [Identity and Grant Contract](docs/IDENTITY_GRANT_CONTRACT.md).
 
 ---
 
