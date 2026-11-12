@@ -75,6 +75,63 @@ class TestWebDemoScenario(unittest.TestCase):
         self.assertTrue(any(x['event_type'] == 'fallback.triggered' for x in events))
         self.assertFalse(any(x['event_type'] == 'command.rejected' for x in events))
 
+    def test_totalmersion_reassigns_both_domains_to_owner(self):
+        self.service.perform('start')
+        self.service.perform('join')
+        old_ai_conversation = self.service.leases['conversation']
+        self.service.perform('totalmersion')
+        snapshot = self.service.snapshot()
+        self.assertEqual(snapshot['session']['session_status'], 'active')
+        self.assertEqual(snapshot['session']['presence_mode'], 'totalmersion')
+        self.assertEqual({d['name']: d['controller'] for d in snapshot['domains']},
+                         {'conversation': 'human-owner', 'gesture': 'human-owner'})
+        self.assertTrue(all(d['edge_authorized_now'] for d in snapshot['domains']))
+        self.assertEqual(self.service.stale_ai_conversation['lease_id'], old_ai_conversation['lease_id'])
+
+        self.service.perform('owner_speak')
+        self.assertTrue(self.service.snapshot()['last_command']['accepted'])
+        self.assertEqual(self.service.snapshot()['last_command']['controller'], 'human-owner')
+        self.service.perform('owner_wave')
+        self.assertTrue(self.service.snapshot()['last_command']['accepted'])
+        self.service.perform('stale_ai_speak')
+        self.assertFalse(self.service.snapshot()['last_command']['accepted'])
+        self.assertEqual(self.service.snapshot()['last_command']['reason'], 'stale_generation')
+
+        with self.assertRaises(CoreDenied):
+            self.service.perform('ai_speak')
+        with self.assertRaises(CoreDenied):
+            self.service.perform('ai_wave')
+
+        self.service.perform('disconnect')
+        suspended = self.service.snapshot()
+        self.assertEqual(suspended['session']['session_status'], 'suspended')
+        self.assertIsNone(suspended['session']['presence_mode'])
+        self.assertFalse(any(d['edge_authorized_now'] for d in suspended['domains']))
+        self.service.perform('stale_owner_wave')
+        self.assertFalse(self.service.snapshot()['last_command']['accepted'])
+        self.assertEqual(self.service.snapshot()['last_command']['reason'], 'revoked')
+        self.assertTrue(any(
+            e['event_type'] == 'presence_mode.changed' and
+            e['data'].get('to_mode') == 'totalmersion'
+            for e in self.service.core.events(self.service.session_id)))
+
+    def test_totalmersion_requires_bridge_and_owner_speech_is_mode_scoped(self):
+        with self.assertRaises(CoreDenied):
+            self.service.perform('totalmersion')
+        self.service.perform('start')
+        with self.assertRaises(CoreDenied):
+            self.service.perform('totalmersion')
+        with self.assertRaises(CoreDenied):
+            self.service.perform('owner_speak')
+        with self.assertRaises(CoreDenied):
+            self.service.perform('stale_ai_speak')
+        self.service.perform('join')
+        with self.assertRaises(CoreDenied):
+            self.service.perform('owner_speak')
+        self.service.perform('totalmersion')
+        with self.assertRaises(CoreDenied):
+            self.service.perform('totalmersion')
+
     def test_local_edge_ttl_fail_closed(self):
         self.service.perform('start')
         self.clock.advance(61)
@@ -158,6 +215,10 @@ class TestWebDemoHttp(unittest.TestCase):
         self.assertIn('if (!check || !check.accepted) return;', js)
         self.assertIn('clearTimeout(animationTimer)', js)
         self.assertIn('OWNER GESTURE · SIMULATED', js)
+        self.assertIn('OWNER SPEECH · SIMULATED', js)
+        self.assertIn('id="pill-totalmersion"', html)
+        self.assertIn('data-action="totalmersion"', html)
+        self.assertNotIn('id="pill-suspended"', html)
         self.assertIn('.robot-wrap.is-waving .robot-arm-right{animation:none!important;', css)
         self.assertIn('.robot-wrap.is-talking .robot-head{animation:none!important;', css)
 
@@ -170,6 +231,20 @@ class TestWebDemoHttp(unittest.TestCase):
             self.assertEqual(json.load(r)['last_command']['reason'], 'stale_generation')
         with self.post('disconnect') as r:
             self.assertEqual(json.load(r)['session']['session_status'], 'suspended')
+
+    def test_http_totalmersion_handover_and_old_ai_rejection(self):
+        for action in ('start', 'join', 'totalmersion'):
+            with self.post(action) as response:
+                snapshot = json.load(response)
+        self.assertEqual(snapshot['session']['presence_mode'], 'totalmersion')
+        self.assertEqual({d['name']: d['controller'] for d in snapshot['domains']},
+                         {'conversation': 'human-owner', 'gesture': 'human-owner'})
+        with self.post('stale_ai_speak') as response:
+            self.assertEqual(json.load(response)['last_command']['reason'], 'stale_generation')
+        with self.post('owner_speak') as response:
+            self.assertTrue(json.load(response)['last_command']['accepted'])
+        with self.post('disconnect') as response:
+            self.assertEqual(json.load(response)['session']['session_status'], 'suspended')
 
     def test_http_rejects_missing_token_cross_origin_bad_actions_and_json(self):
         for override in ({'X-Demo-Token': 'invalid'}, {'Origin': 'http://evil.invalid'}):

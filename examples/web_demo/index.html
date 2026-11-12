@@ -37,22 +37,26 @@
     <main class="dashboard">
       <section class="panel journey" aria-labelledby="journey-title">
         <div class="panel-title-row"><h2 id="journey-title">Demo scenario</h2><span class="mini-index">01 / FLOW</span></div>
-        <p class="panel-description">Run a full controller handover in four steps.</p>
+        <p class="panel-description">Three Presence Modes. Disconnect is a separate safety test.</p>
         <ol class="timeline" id="timeline">
-          <li class="step" data-phase="autonomous"><span class="step-marker">1</span><div><strong>Autonomous</strong><small>AI controls conversation + gesture</small></div></li>
+          <li class="step" data-phase="autonomous"><span class="step-marker">1</span><div><strong>Autonomous</strong><small>AI holds conversation + gesture</small></div></li>
           <li class="step" data-phase="bridge"><span class="step-marker">2</span><div><strong>Bridge</strong><small>Owner takes gesture, AI keeps conversation</small></div></li>
-          <li class="step" data-phase="disconnect"><span class="step-marker">3</span><div><strong>Owner disconnects</strong><small>Simulated loss-of-connection signal</small></div></li>
-          <li class="step" data-phase="suspended"><span class="step-marker">4</span><div><strong>Suspended</strong><small>All new commands are denied</small></div></li>
+          <li class="step" data-phase="totalmersion"><span class="step-marker">3</span><div><strong>TotalMersion</strong><small>Owner takes conversation + gesture</small></div></li>
         </ol>
         <div class="divider"></div>
-        <div class="section-label">SESSION ACTIONS <span>TRUSTED SIMULATION</span></div>
+        <div class="section-label">PRESENCE MODE ACTIONS <span>TRUSTED SIMULATION</span></div>
         <div class="action-stack">
           <button type="button" class="btn btn--primary" data-action="start"><span class="btn-symbol">▶</span> Start session</button>
           <button type="button" class="btn btn--primary" data-action="join"><span class="btn-symbol">◉</span> Join as Identity Owner</button>
+          <button type="button" class="btn btn--primary" data-action="totalmersion"><span class="btn-symbol">◉</span> Enter TotalMersion</button>
+        </div>
+        <div class="divider"></div>
+        <div class="section-label">SEPARATE SAFETY TEST <span>FAIL-CLOSED</span></div>
+        <div class="action-stack">
           <button type="button" class="btn btn--danger" data-action="disconnect"><span class="btn-symbol">⏻</span> Simulate disconnect</button>
           <button type="button" class="btn btn--ghost" data-action="reset"><span class="btn-symbol">↺</span> Reset demonstration</button>
         </div>
-        <p class="small-note">Identity Owner join/disconnect are <b>simulated test signals</b>, not real authentication or presence detection.</p>
+        <p class="small-note"><b>Suspended is a Session status, not a Presence Mode.</b> Owner join/disconnect are simulated test signals, not authentication or presence detection. Speech is visual only; no audio plays.</p>
       </section>
 
       <section class="center-col" aria-label="Digital simulation view">
@@ -125,16 +129,18 @@
             <span class="mode-chevron">›</span>
             <span class="mode-pill" id="pill-bridge">Bridge</span>
             <span class="mode-chevron">›</span>
-            <span class="mode-pill" id="pill-suspended">Suspended</span>
+            <span class="mode-pill" id="pill-totalmersion">TotalMersion</span>
           </div>
         </div>
         <div class="panel sandbox">
           <div class="panel-title-row"><h2>Command sandbox</h2><span class="mini-index">EDGE CHECKS</span></div>
           <div class="sandbox-actions">
-            <button type="button" class="btn btn--mini" data-action="ai_speak">AI speaks</button>
+            <button type="button" class="btn btn--mini" data-action="ai_speak">AI speaks (visual)</button>
             <button type="button" class="btn btn--mini" data-action="ai_wave">AI waves</button>
+            <button type="button" class="btn btn--mini" data-action="owner_speak">Owner speaks (visual)</button>
             <button type="button" class="btn btn--mini" data-action="owner_wave">Owner waves</button>
-            <button type="button" class="btn btn--mini btn--outline" data-action="stale_ai_wave">Test old AI lease</button>
+            <button type="button" class="btn btn--mini btn--outline" data-action="stale_ai_wave">Test old AI gesture lease</button>
+            <button type="button" class="btn btn--mini btn--outline" data-action="stale_ai_speak">Test old AI conversation lease</button>
             <button type="button" class="btn btn--mini btn--outline" data-action="stale_owner_wave">Test disconnected owner</button>
           </div>
           <div class="result-line" id="command-result" aria-live="polite"><span class="result-dot"></span><span>Select a scenario step, then send a simulated command.</span></div>
