@@ -40,7 +40,7 @@ python3 -m venv .venv
 
 On Debian/Ubuntu, if `python3 -m venv .venv` reports that `ensurepip` is unavailable, install the distribution's `python3-venv` package and rerun the first command. **Do not use `--break-system-packages`.**
 
-Open **http://127.0.0.1:8765** on the **same computer** and click **Start session**. Try **Join as Identity Owner**, **Test old AI lease**, and **Simulate disconnect**. Press **Ctrl+C** in the terminal to stop the server.
+Open **http://127.0.0.1:8765** on the **same computer** and click **Start session**. Try **Join as Identity Owner** (Bridge), then **Enter TotalMersion** for full simulated owner control of conversation and gesture. Use **Test old AI conversation lease** to verify denial, or **Simulate disconnect** for a separate fail-closed safety test. Speech is visual only; no audio is generated. Press **Ctrl+C** in the terminal to stop the server.
 
 To run the automated tests from the repository root, using the same virtual environment:
 
