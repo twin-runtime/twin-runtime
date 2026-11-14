@@ -1,6 +1,8 @@
 # RFC-0004: Exclusive Physical-Device Control Across Sessions
 
-**Status:** Draft  
+**Status:** Accepted  
+**Accepted by maintainer:** 2026-11-14  
+**Decision:** Option A for v0.1; C-2 and bounded offline autonomy remain separate RFC work.  
 **Target:** Twin Runtime v0.1  
 **Issue:** [#6 - Physical robot Session exclusivity](https://github.com/twin-runtime/twin-runtime/issues/6)  
 **Related:** [RFC-0001](RFC-0001-session-representation-control-lease.md), [RFC-0003](RFC-0003-command-lease-grant-session.md), [Architecture](../ARCHITECTURE.md), [Runtime Requirements](../RUNTIME_REQUIREMENTS.md)
@@ -9,11 +11,11 @@
 
 ## 1. Decision summary
 
-**Option A (proposed for v0.1): one physical robot may have at most one effective controlling Session at any instant, across all command Control Domains.** Within that one Session, different Controllers may hold different domain Leases under RFC-0001 and the applicable Session Policy.
+**Option A (accepted for v0.1): one physical robot may have at most one effective controlling Session at any instant, across all command Control Domains.** Within that one Session, different Controllers may hold different domain Leases under RFC-0001 and the applicable Session Policy.
 
 This physical-resource invariant is additional to **one active Controller per Control Domain per Session**. A Deployment may contain sequential controlling Sessions. Different devices and independent digital representations may have concurrent Sessions, subject to separate Identity Owner live-presence constraints (C-2).
 
-**DRAFT ONLY:** All MUST/SHOULD language in this RFC specifies *proposed* future requirements, not implemented behavior or an Accepted normative contract. The current Python Core and Edge do not implement device-level exclusivity.
+**Acceptance means architectural approval, not implementation or physical safety certification.** The MUST/SHOULD requirements in this RFC define the accepted v0.1 target contract. The current Python Core and Edge do **not** yet enforce device-level exclusivity, authenticated Owner-only TotalMersion, or OEM safe-state acknowledgements; these require separate accepted implementation changes and verified tests.
 
 ## 2. Observed reference gap
 
@@ -149,7 +151,7 @@ The above is the **online path**: Core must be reachable to issue fresh AI autho
 
 ## 9. Observation boundary without a fourth Presence Mode (P1-3)
 
-**Decision proposed for v0.1:** Observation-only access is a **read-only participant/subscription within the current controlling Session**, not an independent `active` observation-only Session. This avoids conflicting with RFC-0003: every `active` Session continues to have exactly one of `autonomous`, `bridge` or `totalmersion`.
+**Accepted v0.1 decision:** Observation-only access is a **read-only participant/subscription within the current controlling Session**, not an independent `active` observation-only Session. This avoids conflicting with RFC-0003: every `active` Session continues to have exactly one of `autonomous`, `bridge` or `totalmersion`.
 
 - Core/the trusted host MUST explicitly authorize observers through the applicable Grant, Session Policy and observation permissions; a client cannot self-assert an observer role.
 - An observer receives **no Control Lease**, cannot issue commands, `acquire` a device slot, request transfer or be upgraded into a Controller via observation access.
@@ -172,7 +174,7 @@ Core MUST emit correlated per-Session events for affected Sessions. It MUST NOT 
 
 The current reference Core emits `lease.issued` and `control.handover` before Edge ACK. Those currently describe **Core-side issuance within a Session**, not proven physical effectiveness. The later implementation MUST introduce separate device-scoped events rather than retroactively calling early issuance events physical handover.
 
-## 11. Failure behavior and proposed regression tests
+## 11. Failure behavior and required implementation regression tests
 
 | Scenario | Expected behavior after implementation |
 | --- | --- |
@@ -197,11 +199,11 @@ The current reference Core emits `lease.issued` and `control.handover` before Ed
 | Core issues a Lease before Edge ACK | No physical `effective` event yet |
 | OEM reports in-flight action not safely completed | No successor effective; quarantine or remain pending |
 
-Proposed stable denial codes include: `device_busy`, `device_transfer_pending`, `device_epoch_stale`, `device_epoch_conflict`, `device_state_unverified`, `totalmersion_owner_mismatch` and `observation_only_access`. They are **not** yet implemented API errors.
+Target denial codes include: `device_busy`, `device_transfer_pending`, `device_epoch_stale`, `device_epoch_conflict`, `device_state_unverified`, `totalmersion_owner_mismatch` and `observation_only_access`. They are **not** yet implemented API errors.
 
 Tests MUST distinguish simulated reference guarantees from actual robot safety. CI success cannot certify physical hardware.
 
-## 12. Alternatives, trade-offs and remaining review decisions
+## 12. Alternatives, trade-offs and accepted architectural decisions
 
 **Option A (recommended): one controlling Session per physical robot.** Simpler safety/authorization boundary, but a single robot cannot independently serve two controlling Sessions at once. AI and Owner may still share domains *within one Session* using Bridge.
 
@@ -209,7 +211,7 @@ Tests MUST distinguish simulated reference guarantees from actual robot safety. 
 
 **No change (not recommended):** permits competing device commands under separately valid Sessions.
 
-Before marking this Draft **Accepted**, a maintainer must explicitly confirm:
+**Maintainer acceptance record (2026-11-14):** The following architecture choices are approved for the v0.1 target. Executable APIs, authentication evidence, edge/OEM safety hooks and testable contracts remain implementation work, not existing guarantees:
 1. Trusted v0.1 one-Edge-per-device binding and the fail-closed physical-default execution class.
 2. The `free / held / transferring / quarantined` slot model, authorized non-preemptive release, and timeout/recovery safety.
 3. The single durable Core epoch issuer and its relationship to `edge_boot_id`; authenticated Edge state/ACK requirements.
@@ -219,7 +221,7 @@ Before marking this Draft **Accepted**, a maintainer must explicitly confirm:
 7. A separate C-2 RFC for Owner live-presence concurrency across robots.
 8. Offline Autonomous authority is deferred to a separate RFC, never emulated by extending ordinary Lease TTL or granting device-slot transitions while disconnected.
 
-## 13. Delivery plan following acceptance
+## 13. Delivery plan after acceptance
 
 1. Align RFC-0001, RFC-0003, RUNTIME_REQUIREMENTS.md, README.md and ARCHITECTURE.md so that Session/domain authority and physical-device authority are described consistently.
 2. Define physical/digital execution class, authenticated Owner-binding evidence, slot+device-epoch storage, protected Edge messages and read-only observer authorization.
