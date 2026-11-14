@@ -43,6 +43,7 @@ This is a **reference authorization-model gap**, not evidence of a physical robo
 - Delegated TotalMersion, employee operators masquerading as the Identity Owner or a fourth Presence Mode.
 - G-Brain, experience provenance, recorded sensory experiences or memory transfer.
 - Defining the maximum number of simultaneous genuine live TotalMersion Sessions for one Identity Owner across *different* robots (C-2, separate RFC).
+- Offline or disconnected Autonomous authority **beyond already installed bounded Leases** (separate RFC; not a reason to increase ordinary Lease TTL).
 
 ## 4. Trusted physical-resource identity and execution class
 
@@ -96,6 +97,7 @@ Core MUST authenticate and authorize the caller for the particular device and re
 5. **New boot:** On reboot, Edge starts with **no installed authority** and obtains a fresh, non-reused `edge_boot_id`. Core MUST reject boot-ID reuse, discard all undelivered old-boot updates, invalidate old authority and reconcile the device slot before any command authority becomes effective. Given these preconditions, an Edge-local persistent high-water mark across boots is **not** required for reference v0.1. Core's device-epoch record remains durable across restarts.
 6. **Core restart / recovery:** After a Core crash or restart, Core MUST NOT grant new device authority from unverified persisted `held`, `transferring` or `quarantined` state. It must obtain authenticated Edge state including current `edge_boot_id`, installed `device_epoch`, controlling `session_id` and fencing/safe-state readiness, or use a separately specified recovery process providing equivalent proof. Timeout alone does not establish safe completion.
 7. **Unknown identity or conflict:** If identity binding, authority order, Edge state, acknowledgement authentication or device safety readiness is unavailable/contradictory, new physical authority MUST fail closed.
+8. **Disconnected Edge:** While the authenticated Core-to-Edge channel is unavailable, no device-slot or `device_epoch` transition may become **effective at the Edge**. Core MUST NOT mark the robot `free` merely because it cannot reach Edge; a pending revocation/release must remain non-free and, if safe completion cannot be confirmed before its deadline, become `quarantined`. Edge MUST accept Runtime commands only under already installed, locally bounded Lease authority; after expiry it MUST reject protected commands and the OEM-local safe behavior applies. Loss of human liveness during this period MUST fence that human's command authority at the locally enforced deadline. No new Autonomous fallback Lease or offline authority beyond existing Lease bounds is permitted by this RFC. Any future offline authority MUST be defined in a separate Accepted RFC, bound to the holding Session's `(edge_id, edge_boot_id, device_epoch, session_id)`, and MUST NOT release, acquire or transfer the device slot.
 
 The Edge needs an authenticated Core-to-Edge control channel and authenticated acknowledgements for conformance; the reference Python class does **not** implement those network trust boundaries.
 
@@ -133,6 +135,18 @@ Any `Autonomous` fallback under RFC-0003 is **within the already-authorized Sess
 
 There is no guaranteed zero-interruption physical handoff in v0.1; a conservative stop-before-start policy is intended.
 
+### 8.1 Intra-Session fallback is not an inter-Session transfer (N-1)
+
+An authorized Presence Mode transition **within the same Session**, including an explicitly permitted `totalmersion` or `bridge` to `autonomous` fallback under RFC-0003 Section 6, MUST NOT acquire, release or transfer the device slot, and MUST NOT allocate a new `device_epoch`. The physical slot remains `held` by the **same Session**.
+
+- The transition MUST invalidate the previous mode's Leases and advance the applicable **Session/Control Domain generations** before installing any new AI Leases. The AI Controller must be explicitly authorized by the active Representation Grant, Session Policy and Compliance Policy; it does not inherit the Owner's authority.
+- Edge MUST accept the new Lease installation only when it matches the current authenticated `(edge_id, edge_boot_id, device_epoch, session_id)` and the selected Session is still `held`. Session/Domain Lease fencing does **not** constitute a physical device-slot ownership transition.
+- Core MUST NOT initiate a new intra-Session fallback while the device slot is `transferring` or `quarantined`. Edge MUST reject any attempted fallback Lease installation during either state with an appropriate denial such as `device_transfer_pending` or `device_state_unverified`.
+- No mode change, Owner disconnect, transient liveness loss or intra-Session fallback outcome may release a slot. Only the explicit authorized release/admin-revocation rules in Section 5.2, followed by the Edge/OEM safe-state ACK in Section 8, can transition the slot to `free`.
+- Core MUST audit the authorized fallback with the **unchanged** device epoch, Session ID, previous and new Controller classes, reason and correlation ID in both the Session audit and device-scoped log. Core MUST distinguish fallback initiation from Edge-acknowledged effective AI control; merely issuing a Lease is not proof of physical effectiveness.
+
+The above is the **online path**: Core must be reachable to issue fresh AI authority. When Core is unavailable, the disconnected-Edge rule in Section 6.8 applies. Any longer-lived offline AI authority requires a separate Accepted RFC and is not created by the fallback rule here.
+
 ## 9. Observation boundary without a fourth Presence Mode (P1-3)
 
 **Decision proposed for v0.1:** Observation-only access is a **read-only participant/subscription within the current controlling Session**, not an independent `active` observation-only Session. This avoids conflicting with RFC-0003: every `active` Session continues to have exactly one of `autonomous`, `bridge` or `totalmersion`.
@@ -152,7 +166,7 @@ Core MUST maintain a durable, **strictly ordered per-device** transition record.
 - trusted device/Edge identity, `edge_boot_id` and `device_epoch`;
 - prior and new `session_id` where applicable;
 - operation/actor class, reason, correlation ID and device transition sequence;
-- status: `acquired`, `release_requested`, `fence_requested`, `fenced_ack`, `released`, `effective`, `quarantined`, `denied` or equivalent explicit types.
+- status: `acquired`, `release_requested`, `fence_requested`, `fenced_ack`, `released`, `effective`, `fallback`, `quarantined`, `denied` or equivalent explicit types.
 
 Core MUST emit correlated per-Session events for affected Sessions. It MUST NOT publish an `effective` device-control event until the corresponding authenticated Edge acknowledgement for the **current** epoch and safe-state prerequisites have been validated.
 
@@ -174,6 +188,10 @@ The current reference Core emits `lease.issued` and `control.handover` before Ed
 | Non-Owner Controller requests `totalmersion` Lease | Reject `totalmersion_owner_mismatch` despite Session Policy |
 | Observation participant tries to command/acquire | Deny; no Control Lease or slot transition |
 | One Session in `bridge`, multiple domain Controllers | Valid with independent scoped Leases |
+| Owner liveness lost in `totalmersion`, valid online Autonomous fallback | Same slot stays `held`, device epoch unchanged, Owner Lease fenced, AI Lease has higher domain generation; effective only after Edge ACK |
+| Fallback attempted while slot `transferring` or `quarantined` | Reject; no AI Lease install or unauthorized device-slot transition |
+| Admin revokes while Edge is disconnected | Slot does not become `free`; pending fencing eventually quarantines if safe-state ACK cannot be obtained; Session B denied |
+| Core connection lost while `totalmersion` is active | Human commands rejected after local liveness/Lease deadline; AI cannot obtain new Lease offline, slot unchanged; safe-state fallback on expiry |
 | Two distinct robots, different controlling Sessions | Permitted, subject to separate Owner live-presence C-2 constraints |
 | Parallel purely digital Sessions | Permitted without physical device slot |
 | Core issues a Lease before Edge ACK | No physical `effective` event yet |
@@ -199,6 +217,7 @@ Before marking this Draft **Accepted**, a maintainer must explicitly confirm:
 5. Observer-as-participant model versus independent observation Sessions.
 6. The minimum testable simulated safe-state/ACK boundary, with no claim of OEM certification.
 7. A separate C-2 RFC for Owner live-presence concurrency across robots.
+8. Offline Autonomous authority is deferred to a separate RFC, never emulated by extending ordinary Lease TTL or granting device-slot transitions while disconnected.
 
 ## 13. Delivery plan following acceptance
 
