@@ -2,7 +2,8 @@
 
 **Status:** Draft  
 **Target:** Twin Runtime v0.1  
-**Related:** `ARCHITECTURE.md`, `RUNTIME_REQUIREMENTS.md`
+**Related:** `ARCHITECTURE.md`, `RUNTIME_REQUIREMENTS.md`  
+**Related Draft (not accepted):** [RFC-0004 - Physical-device Session exclusivity](RFC-0004-physical-device-session-exclusivity.md). The additional device-level invariant is proposed only; existing Session-level semantics remain unchanged until an RFC is accepted.
 
 ---
 
