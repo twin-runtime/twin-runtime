@@ -1,0 +1,60 @@
+name: Integration or adapter proposal
+description: Discuss an external AI, transport or robot integration before implementation
+title: "[integration] "
+body:
+  - type: markdown
+    attributes:
+      value: "OEM/robot adapters currently live in external repositories. Twin Runtime has no published adapter conformance suite or hardware safety certification."
+  - type: input
+    id: stack
+    attributes:
+      label: Manufacturer, SDK or stack
+      placeholder: e.g. ROS 2, OEM SDK, external AI provider
+    validations:
+      required: true
+  - type: input
+    id: repository
+    attributes:
+      label: External adapter repository (if available)
+      placeholder: https://github.com/organization/adapter
+  - type: dropdown
+    id: integration
+    attributes:
+      label: Integration surface
+      options:
+        - Intent API
+        - Realtime API
+        - Both
+        - Under discussion
+    validations:
+      required: true
+  - type: textarea
+    id: control
+    attributes:
+      label: Control Domains and controller authority
+      description: How will Runtime authorization and scoped leases be enforced?
+    validations:
+      required: true
+  - type: textarea
+    id: safety
+    attributes:
+      label: Safety self-assessment
+      description: "Cover capabilities, heartbeat, stop, connection loss, lease expiration/revocation, OEM protections and physical-safety responsibility. A self-assessment is not certification."
+    validations:
+      required: true
+  - type: textarea
+    id: core_change
+    attributes:
+      label: Does this require a Runtime Core or adapter contract change?
+      description: If yes, open an RFC after this Issue is discussed.
+    validations:
+      required: true
+  - type: checkboxes
+    id: guardrails
+    attributes:
+      label: Safety and compatibility guardrails
+      options:
+        - label: This proposal does not bypass OEM safety or expose raw motor/torque control over a public internet API.
+          required: true
+        - label: I will not describe an unverified adapter as Twin Runtime compatible or certified.
+          required: true

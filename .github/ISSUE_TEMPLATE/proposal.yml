@@ -1,0 +1,48 @@
+name: Feature or architecture proposal
+description: Propose a new capability or a change to Runtime behavior
+title: "[proposal] "
+body:
+  - type: markdown
+    attributes:
+      value: "For security vulnerabilities, use the private reporting path in SECURITY.md. Major contract changes require an Issue followed by an RFC PR."
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: Describe an actual use case and why current Runtime behavior is insufficient.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed change and alternatives
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - Protocol or public API
+        - Identity / Representation Grant
+        - Session / Presence / Control Lease
+        - Edge / safety / authorization
+        - Adapter interface / normative spec
+        - Documentation / examples / tooling
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Security, authorization and compatibility impact
+      description: Explicitly write "None known" if you expect no impact.
+    validations:
+      required: true
+  - type: checkboxes
+    id: process
+    attributes:
+      label: Process
+      options:
+        - label: I reviewed CONTRIBUTING.md and will propose an RFC before implementing a normative change.
+          required: true
