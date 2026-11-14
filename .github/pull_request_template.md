@@ -14,7 +14,7 @@
 <!-- Tests run, platforms checked, limitations. -->
 
 ## Contribution checklist
-- [ ] I followed [CONTRIBUTING.md](../CONTRIBUTING.md) and the RFC process when required.
+- [ ] I followed [CONTRIBUTING.md](https://github.com/twin-runtime/twin-runtime/blob/main/CONTRIBUTING.md) and the RFC process when required.
 - [ ] I added/updated tests if behavior changed, or explained why not.
-- [ ] Every new commit in this PR contains my `Signed-off-by:` DCO trailer.
+- [ ] Every non-merge commit authored in this PR contains my `Signed-off-by:` DCO trailer.
 - [ ] I checked that no secrets, private customer data or unauthorized third-party code are included.

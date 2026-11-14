@@ -58,9 +58,16 @@ jobs:
           if not commits:
               sys.exit("DCO check failed: no PR commits returned.")
 
+          authored_commits = [
+              commit for commit in commits
+              if len(commit.get("parents", [])) <= 1
+          ]
+          if not authored_commits:
+              sys.exit("DCO check failed: no authored PR commits returned.")
+
           missing = [
               f"{commit['sha'][:12]} {commit['commit']['message'].splitlines()[0]}"
-              for commit in commits
+              for commit in authored_commits
               if not trailer.search(commit["commit"]["message"])
           ]
           if missing:
@@ -70,5 +77,5 @@ jobs:
               print("Add a sign-off to each PR commit as explained in CONTRIBUTING.md.")
               sys.exit(1)
 
-          print(f"DCO sign-off trailers verified for {len(commits)} PR commit(s).")
+          print(f"DCO sign-off trailers verified for {len(authored_commits)} non-merge PR commit(s); skipped {len(commits) - len(authored_commits)} merge commit(s).")
           PY

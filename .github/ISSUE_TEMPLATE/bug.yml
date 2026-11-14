@@ -4,7 +4,7 @@ title: "[bug] "
 body:
   - type: markdown
     attributes:
-      value: "Do NOT report vulnerabilities here. Follow [SECURITY.md](../../SECURITY.md) to report them privately."
+      value: "Do NOT report vulnerabilities here. Follow [SECURITY.md](https://github.com/twin-runtime/twin-runtime/security/policy) to report them privately."
   - type: input
     id: version
     attributes:

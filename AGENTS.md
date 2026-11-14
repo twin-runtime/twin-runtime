@@ -39,13 +39,13 @@ Never expose raw motor or torque control through a public internet API.
 
 Safety takes priority over functionality. Do not bypass manufacturer safety systems.
 
-Robot adapters must follow the [adapter contribution and safety checklist](CONTRIBUTING.md#robot-adapters-and-integrations). Do not expose raw motor or torque control through a public internet API.
+Robot adapters must follow the [adapter contribution and safety checklist](CONTRIBUTING.md#robot-adapters-and-integrations), including the applicable mandatory heartbeat, stop, loss-of-connection and lease-expiration requirements.
 
 ## Contributions
 
 Prefer small, reviewable changes. Follow the single [Issue / PR / RFC / Security contribution path](CONTRIBUTING.md#where-to-start).
 
-Significant protocol, API, authorization, safety, Session, control or adapter-interface changes require an Issue followed by an accepted RFC, using [rfcs/README.md](rfcs/README.md), before implementation.
+Significant new normative protocol, API, authorization, safety, Session, control or adapter-interface changes require an Issue followed by an Accepted RFC, using [rfcs/README.md](rfcs/README.md). The v0.1 experimental reference implementation predates this process; clearly labeled prototypes against Proposed RFCs are permitted without claiming normative acceptance.
 
 ## Testing
 

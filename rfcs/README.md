@@ -23,7 +23,9 @@ Routine bug fixes, documentation, tests and examples do not need an RFC unless t
    - **Accepted:** explicitly approved by the maintainer;
    - **Rejected:** not accepted;
    - **Superseded:** replaced by a later accepted RFC.
-4. The maintainer records the outcome in the PR and updates the RFC status. **Do not implement a significant change before the relevant RFC is accepted.**
+4. The maintainer records the outcome in the PR and updates the RFC status. **New normative contracts require an Accepted RFC before they are implemented as normative requirements.**
+
+**v0.1 transition:** The existing experimental Core and Edge reference implementation predates this RFC process and may already prototype concepts from Draft or Proposed RFCs. Maintainers may continue clearly labeled experimental prototyping against Proposed RFCs to validate designs. Such prototypes do **not** approve an RFC or establish a stable normative contract; new normative API, authorization or safety changes still require acceptance first.
 
 Existing RFC-0001 and RFC-0002 are Draft; RFC-0003 is Proposed pending acceptance. No status change here asserts that any unimplemented requirement already exists in Runtime Core.
 

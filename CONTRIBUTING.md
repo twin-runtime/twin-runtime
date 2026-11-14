@@ -8,11 +8,12 @@ Twin Runtime is an Apache-2.0 open-source project. Independent developers, resea
 | --- | --- |
 | Small documentation, test, example or demo fix | Open a focused PR directly |
 | Reproducible non-security bug | Open a Bug Issue; then a PR if you have a fix |
-| New feature, integration or adapter proposal | Open a Proposal or Integration/Adapter Issue before implementation |
-| Change to protocol, public APIs, authorization, safety model, Session or Control semantics, adapter interface or normative schemas | Open an Issue, then submit an RFC as a PR under `rfcs/`; implementation follows an accepted RFC |
+| New feature for this repository or an integration requiring changes here | Open a Proposal or Integration/Adapter Issue before implementation |
+| Independent external adapter using existing Runtime interfaces | No Issue, PR or maintainer approval required under Apache-2.0 |
+| New normative change to protocol, public APIs, authorization, safety model, Session or Control semantics, adapter interface or schemas | Open an Issue, then submit an RFC as a PR under `rfcs/`; normative implementation follows an Accepted RFC |
 | Security vulnerability or bypass | **Report privately**, following [SECURITY.md](SECURITY.md). Never open a public Issue or PR disclosing the vulnerability |
 
-The [RFC process](rfcs/README.md) defines proposal statuses and acceptance. GitHub Discussions are not enabled; use an Issue for technical questions or proposals. For substantial changes, an Issue is the default starting point, not an unreviewed implementation PR.
+The [RFC process](rfcs/README.md) defines proposal statuses, an explicit v0.1 experimental-prototyping transition and acceptance. GitHub Discussions are not enabled; use an Issue (a blank Issue is allowed) for technical questions or proposals. For substantial changes, an Issue is the default starting point, not an unreviewed implementation PR.
 
 ## Pull Request workflow
 
@@ -26,14 +27,16 @@ Avoid dependencies or copied code that conflict with Apache-2.0 or for which you
 
 ## Robot adapters and integrations
 
-**For now, OEM/robot adapters belong in separate repositories** maintained by their producers or integrators. The reference repository does not yet provide a stable adapter interface, published conformance suite or physical-hardware safety validation. Open an Integration/Adapter Issue to discuss how an external adapter connects; any Core/adapter-contract change requires an RFC first.
+**For now, OEM/robot adapters belong in separate repositories** maintained by their producers or integrators. The reference repository does not yet provide a stable adapter interface, published conformance suite or physical-hardware safety validation. **Independent external adapters need no Issue, approval or license from the maintainers beyond Apache-2.0.** Open an Integration/Adapter Issue if the adapter needs changes to this repository; normative Core/adapter-contract changes require an Accepted RFC first.
 
-Describe the adapter's proposed Intent API or Realtime API integration, Control Domains and which party operates it. Provide a self-assessment of:
+Robot adapters **must support, where applicable, capability reporting, heartbeat, stop, connection-loss handling and Control Lease expiry**, without bypassing OEM safety systems. Describe the external adapter's Intent API or Realtime API integration, Control Domains and responsible operator, and provide a self-assessment covering:
 - capability reporting and controller/Control Domain boundaries;
 - heartbeat and communication-loss handling;
 - stop and fail-safe behavior;
 - Control Lease expiry and revocation;
 - preservation of OEM safety mechanisms.
+
+For each applicable mandatory mechanism, describe how it is supported; for non-applicable items, explain why. A self-assessment does not replace implementing applicable safety safeguards.
 
 Never bypass manufacturer safety controls or expose raw motor/torque control through a public internet API. Document who is responsible for integration, deployment and hardware safety; a self-assessment is **not** an independent safety review.
 
@@ -43,13 +46,13 @@ Do not label an adapter **"Twin Runtime compatible"** or **"certified"** until p
 
 Contributors certify they have the right to submit each contribution under Apache-2.0. Read the [Developer Certificate of Origin](https://developercertificate.org/).
 
-Sign off **all newly submitted PR commits, including maintainer commits, from this policy onward**. Do not rewrite already-merged history just to add signatures.
+Sign off **all newly authored non-merge PR commits, including maintainer commits, from this policy onward**. DCO checks skip merge commits created while updating a PR branch, not independently authored changes. Do not rewrite already-merged history just to add signatures.
 
 ```bash
 git commit -s -m "fix: describe the change"
 ```
 
-This adds a trailer such as `Signed-off-by: Your Name <you@example.com>`. When committing through an API or web editor, include the same trailer in the commit message. The PR DCO workflow checks for the trailer in each PR commit; it does not independently verify copyright ownership or employer consent.
+This adds a trailer such as `Signed-off-by: Your Name <you@example.com>`. When committing through an API or web editor, include the same trailer in the commit message. The PR DCO workflow checks for the trailer in each non-merge PR commit; it does not independently verify copyright ownership or employer consent.
 
 If your latest local commit is missing the trailer, use `git commit --amend --signoff --no-edit` and update the PR branch. For multiple unsigned PR commits, use `git rebase --signoff` with care, then update your PR branch. Never rewrite the protected `main` history.
 
