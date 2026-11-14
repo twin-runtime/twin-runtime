@@ -37,37 +37,21 @@ Never expose raw motor or torque control through a public internet API.
 
 ## Safety
 
-Safety takes priority over functionality.
+Safety takes priority over functionality. Do not bypass manufacturer safety systems.
 
-Every robot adapter must support, where applicable:
-
-- capabilities reporting
-- heartbeat
-- stop
-- connection-loss handling
-- control-lease expiry
-
-Do not bypass manufacturer safety systems.
+Robot adapters must follow the [adapter contribution and safety checklist](CONTRIBUTING.md#robot-adapters-and-integrations). Do not expose raw motor or torque control through a public internet API.
 
 ## Contributions
 
-Prefer small, reviewable changes.
+Prefer small, reviewable changes. Follow the single [Issue / PR / RFC / Security contribution path](CONTRIBUTING.md#where-to-start).
 
-Significant changes to:
-- protocol,
-- APIs,
-- safety model,
-- session model,
-- control model,
-- adapter interfaces
-
-must first be proposed through an Issue, Discussion or RFC.
+Significant protocol, API, authorization, safety, Session, control or adapter-interface changes require an Issue followed by an accepted RFC, using [rfcs/README.md](rfcs/README.md), before implementation.
 
 ## Testing
 
 New functionality must include appropriate tests.
 
-Robot adapters must eventually pass Twin Runtime conformance tests before being described as compatible.
+Do not claim adapter compatibility or certification while no published Twin Runtime conformance suite or verification process exists. See [CONTRIBUTING.md](CONTRIBUTING.md#robot-adapters-and-integrations).
 
 ## Licensing
 

@@ -1,0 +1,74 @@
+name: DCO sign-off
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: dco-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  signoff:
+    name: Verify PR commit sign-offs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check DCO trailers in PR commits
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+          GH_PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import sys
+          from urllib.request import Request, urlopen
+
+          repo = os.environ["GH_REPOSITORY"]
+          number = os.environ["GH_PR_NUMBER"]
+          token = os.environ["GH_TOKEN"]
+          url = f"https://api.github.com/repos/{repo}/pulls/{number}/commits"
+          headers = {
+              "Accept": "application/vnd.github+json",
+              "Authorization": f"Bearer {token}",
+              "X-GitHub-Api-Version": "2022-11-28",
+          }
+          trailer = re.compile(
+              r"(?im)^Signed-off-by:[ \t]*[^<>\n]+[ \t]+<[^<>@\s]+@[^<>\s]+>[ \t]*$"
+          )
+
+          commits = []
+          page = 1
+          while True:
+              request = Request(f"{url}?per_page=100&page={page}", headers=headers)
+              with urlopen(request, timeout=20) as response:
+                  batch = json.load(response)
+              commits.extend(batch)
+              if len(batch) < 100:
+                  break
+              page += 1
+
+          if not commits:
+              sys.exit("DCO check failed: no PR commits returned.")
+
+          missing = [
+              f"{commit['sha'][:12]} {commit['commit']['message'].splitlines()[0]}"
+              for commit in commits
+              if not trailer.search(commit["commit"]["message"])
+          ]
+          if missing:
+              print("Missing Signed-off-by trailers in PR commits:")
+              for item in missing:
+                  print(f"  - {item}")
+              print("Add a sign-off to each PR commit as explained in CONTRIBUTING.md.")
+              sys.exit(1)
+
+          print(f"DCO sign-off trailers verified for {len(commits)} PR commit(s).")
+          PY

@@ -1,0 +1,59 @@
+name: Bug report
+description: Report a reproducible, non-security bug in Twin Runtime
+title: "[bug] "
+body:
+  - type: markdown
+    attributes:
+      value: "Do NOT report vulnerabilities here. Follow [SECURITY.md](../../SECURITY.md) to report them privately."
+  - type: input
+    id: version
+    attributes:
+      label: Runtime version or commit SHA
+      placeholder: e.g. main @ 22e58fe
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - Runtime Core
+        - Edge enforcement
+        - API / protocol
+        - Web demo
+        - Tests / tooling
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Use a minimal, non-sensitive example.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior and sanitized logs
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: OS and Python version
+      placeholder: e.g. Windows 11, Python 3.12
+  - type: checkboxes
+    id: security
+    attributes:
+      label: Security disclosure
+      options:
+        - label: This report does not disclose a security vulnerability or private credentials.
+          required: true

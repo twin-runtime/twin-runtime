@@ -1,6 +1,7 @@
 # RFC-0003: Command Authorization, Lease Fencing, Grant Binding and Session Interruption
 
-**Status:** PROPOSED - COMMIT CANDIDATE, pending repository owner approval  
+**Status:** Proposed  
+**Review note:** Commit candidate; pending maintainer acceptance  
 **Target:** Twin Runtime v0.1  
 **Date:** 2026-11-09  
 **History:** Consolidates the local RFC-0003 review drafts; this document is the single proposed normative baseline.  

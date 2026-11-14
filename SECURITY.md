@@ -2,11 +2,9 @@
 
 ## Reporting a Vulnerability
 
-Please do not report security vulnerabilities through public GitHub Issues or Discussions.
+Do not disclose vulnerabilities in public GitHub Issues or Pull Requests.
 
-Report security vulnerabilities privately to:
-
-support@twin.rent
+When GitHub private vulnerability reporting is available for this repository, use **Security > Report a vulnerability**. Otherwise, report privately to **support@twin.rent**. The email address is a fallback channel; maintainers should verify that it receives messages. Do not publish exploit details while reporting.
 
 Please include:
 - a description of the vulnerability,

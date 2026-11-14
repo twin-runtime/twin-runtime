@@ -345,7 +345,7 @@ Twin Runtime is currently in an early architecture and implementation phase.
 
 Before contributing, read [CONTRIBUTING.md](CONTRIBUTING.md) and the current RFCs.
 
-Significant semantic or architectural changes should be proposed through the RFC process before implementation.
+Significant semantic or architectural changes require an Issue and follow the [RFC process](rfcs/README.md) before implementation. See [CONTRIBUTING.md](CONTRIBUTING.md#where-to-start) for the single Issue / PR / RFC / Security path.
 
 ---
 
