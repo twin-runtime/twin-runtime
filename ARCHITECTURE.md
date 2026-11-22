@@ -23,7 +23,7 @@
 
 `register_edge(edge_id, edge_boot_id, supported_control_domains, execution_class=None, acquire_principal_id=None)` is a **trusted local provisioning call**. Physical registration requires an explicit, nonempty `acquire_principal_id`. It grants device acquisition only; it does not grant Controller scopes, preemption, release or administrator revocation. Core and Edge execution classes must be configured consistently by the trusted host. A caller's remote `edge.register` declaration is not trusted provisioning, and the optional schema field alone cannot establish that trust.
 
-`acquire_device(session_id, authenticated_principal_id)` requires a ready or active Session, active Session/Compliance policies, and a principal matching that device's provisioned acquirer. The host must authenticate that principal before the call. Grants and policies remain independently checked for every Lease. Acquisition atomically changes `free` to `held` and increments the durable device epoch; repeating it for the holding Session is idempotent. It never preempts another Session.
+`acquire_device(session_id, authenticated_principal_id)` requires a ready or active Session, active Session/Compliance policies, a currently valid Representation Grant for at least one allowed Presence Mode, and a principal matching that device's provisioned acquirer. The host must authenticate that principal before the call. Grants and policies remain independently checked for every Lease. Acquisition atomically changes `free` to `held` and increments the durable device epoch; repeating it for the holding Session is idempotent even if its Grant has subsequently expired or been revoked (no new authority is issued). It never preempts another Session.
 
 Core includes `device_epoch` in physical Control Leases and authority install/revoke messages. Edge stores it in the installed Lease watermark, so the existing `command-envelope` needs no new field: the checked Lease ID, generation, Controller, Session and local boot state bind the command to the device epoch. Invalid installations do not reserve the device. A valid revocation retains the device watermark and cannot free it.
 
@@ -31,6 +31,7 @@ Core includes `device_epoch` in physical Control Leases and authority install/re
 | --- | --- |
 | Physical registration lacks a configured acquirer | `device_acquirer_unconfigured` |
 | Caller does not match the configured acquirer | `device_acquire_not_authorized` |
+| New acquisition without a currently valid Representation Grant | `no_valid_representation_authority` |
 | Physical Lease requested before acquire | `device_not_acquired` |
 | Another Session holds the physical slot | `device_busy` |
 | Quarantined Core slot or physical Edge authority without an epoch | `device_state_unverified` |

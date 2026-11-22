@@ -5,10 +5,12 @@ Core/Edge restart reconciliation.
 """
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
+from datetime import timedelta
 import multiprocessing
 import sqlite3
 import threading
 import unittest
+from unittest.mock import patch
 
 from reference.runtime_core import CoreDenied, RuntimeCore
 from reference.edge_fence import EdgeFenceState
@@ -38,9 +40,10 @@ class TestDeviceExclusivity(unittest.TestCase):
     command = fixtures.TestRuntimeCore.command
     assertReason = fixtures.TestRuntimeCore.assertReason
 
-    def second_session(self, session_id="session-2", edge_id="edge-1", *, active=True):
+    def second_session(self, session_id="session-2", edge_id="edge-1", *, active=True,
+                       grant_overrides=None):
         grant_id = "grant-" + session_id
-        self.core.provision_grant(self.grant(grant_id=grant_id))
+        self.core.provision_grant(self.grant(grant_id=grant_id, **(grant_overrides or {})))
         self.core.create_session(session_id, "owner-1", "twin-1", [grant_id], edge_id)
         self.core.set_policies(
             session_id,
@@ -101,6 +104,44 @@ class TestDeviceExclusivity(unittest.TestCase):
         self.assert_held()
         self.assertReason("controller_not_authorized", self.core.issue_lease,
                           "session-1", "device-admin", "device-admin", "conversation", "grant-1")
+
+    def _assert_invalid_grant_denies_free_device(self):
+        self.assertReason("no_valid_representation_authority", self.core.acquire_device,
+                          "session-1", "device-admin")
+        slot = self.core.device_slot("edge-1")
+        self.assertEqual((slot["state"], slot["session_id"], slot["device_epoch"]),
+                         ("free", None, 0))
+        events = self.core.device_events("edge-1")
+        self.assertEqual([(e["status"], e["reason"]) for e in events],
+                         [("denied", "no_valid_representation_authority")])
+        self.assertEqual(events[0]["session_id"], "session-1")
+        self.assertEqual(self.core.pending_edge_updates("edge-1"), [])
+        # A different Session with a Grant valid at the current simulated time
+        # must still be able to acquire the device, starting with epoch 1.
+        self.second_session(active=False, grant_overrides={
+            "valid_from": fixtures.iso(self.clock.now - timedelta(minutes=1)),
+            "valid_until": fixtures.iso(self.clock.now + timedelta(minutes=30)),
+        })
+        self.core.acquire_device("session-2", "device-admin")
+        self.assert_held("session-2")
+        self.assertEqual([e["status"] for e in self.core.device_events("edge-1")],
+                         ["denied", "acquired"])
+
+    def test_acquire_requires_currently_valid_grant_revoked_ready(self):
+        self.core.revoke_grant("grant-1")
+        self.assertEqual(self.core.session_snapshot("session-1")["session_status"], "ready")
+        self._assert_invalid_grant_denies_free_device()
+
+    def test_acquire_requires_currently_valid_grant_expired_ready(self):
+        self.clock.advance(31 * 60)
+        self.assertEqual(self.core.session_snapshot("session-1")["session_status"], "ready")
+        self._assert_invalid_grant_denies_free_device()
+
+    def test_acquire_requires_currently_valid_grant_expired_active(self):
+        self.start(acquire_device=False)
+        self.clock.advance(31 * 60)
+        self.assertEqual(self.core.session_snapshot("session-1")["session_status"], "active")
+        self._assert_invalid_grant_denies_free_device()
 
     def test_physical_registration_requires_explicit_device_acquirer(self):
         self.assertReason("device_acquirer_unconfigured", self.core.register_edge,
@@ -194,6 +235,64 @@ class TestDeviceExclusivity(unittest.TestCase):
                     process.close()
             results_queue.close()
             results_queue.join_thread()
+
+    def test_acquire_rolls_back_if_device_audit_raises(self):
+        with patch.object(self.core, "_device_audit", side_effect=RuntimeError("audit unavailable")):
+            with self.assertRaisesRegex(RuntimeError, "audit unavailable"):
+                self.core.acquire_device("session-1", "device-admin")
+        slot = self.core.device_slot("edge-1")
+        self.assertEqual((slot["state"], slot["session_id"], slot["device_epoch"]),
+                         ("free", None, 0))
+        self.assertEqual(self.core.device_events("edge-1"), [])
+        self.core.acquire_device("session-1", "device-admin")
+        self.assert_held()
+
+    def test_reboot_with_free_slot_keeps_free_state(self):
+        self.core.register_edge("edge-1", "boot-2", ["conversation", "gesture"],
+                                acquire_principal_id="device-admin")
+        slot = self.core.device_slot("edge-1")
+        self.assertEqual((slot["state"], slot["session_id"], slot["device_epoch"]),
+                         ("free", None, 0))
+        self.assertEqual(self.core.device_events("edge-1"), [])
+        self.core.activate_session("session-1", "autonomous")
+        self.core.acquire_device("session-1", "device-admin")
+        self.assert_held()
+
+    def test_held_reregistration_non_digital_spellings_keeps_physical(self):
+        self.start()
+        for execution_class in ("DIGITAL", " digital", "digital ", "Digital"):
+            with self.subTest(execution_class=execution_class):
+                self.core.register_edge(
+                    "edge-1", "boot-1", ["conversation", "gesture"],
+                    execution_class=execution_class, acquire_principal_id="device-admin"
+                )
+                self.assert_held()
+                self.assertEqual(self.core.session_snapshot("session-1")["session_status"],
+                                 "active")
+        self.assertEqual([e["status"] for e in self.core.device_events("edge-1")],
+                         ["acquired"])
+
+    def test_core_physical_edge_digital_mismatch_still_rejects_second_session(self):
+        self.start()
+        lease = self.lease()
+        mismatched_edge = EdgeFenceState(
+            "edge-1", "boot-1", execution_class="digital",
+            supported_control_domains=["conversation", "gesture"],
+            monotonic_clock=self.clock.monotonic,
+            trusted_wall_clock=self.clock.wall,
+        )
+        for _, message in self.core.pending_edge_updates("edge-1"):
+            self.assertEqual(mismatched_edge.install_authority(message),
+                             (True, "accepted"))
+        self.second_session()
+        self.assertReason("device_busy", self.core.acquire_device, "session-2", "device-admin")
+        self.assertReason("device_busy", self.core.issue_lease,
+                          "session-2", "ai-1", "ai-1", "conversation",
+                          "grant-session-2")
+        self.assert_held()
+        # This tests Core exclusivity only, NOT correct Edge provisioning.
+        self.assertEqual(mismatched_edge.check_command(self.command(lease), "ai-1"),
+                         (True, "accepted"))
 
     def test_slot_and_epoch_survive_core_restart(self):
         self.start()

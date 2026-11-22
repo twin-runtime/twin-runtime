@@ -274,8 +274,8 @@ class RuntimeCore:
         result=None
         with self._transaction() as db:
             session=self._session(db,session_id)
-            self._policy(db,'session_policy',session['policy_id'],session['policy_version'])
-            self._policy(db,'compliance_policy',session['compliance_id'],session['compliance_version'])
+            policy=self._policy(db,'session_policy',session['policy_id'],session['policy_version'])
+            compliance=self._policy(db,'compliance_policy',session['compliance_id'],session['compliance_version'])
             edge=self._need(db.execute('SELECT * FROM edges WHERE edge_id=?',
                                        (session['edge_id'],)).fetchone(),'edge')
             slot=self._need(db.execute('SELECT * FROM device_slots WHERE edge_id=?',
@@ -292,6 +292,17 @@ class RuntimeCore:
                 denial='invalid_session_state'
             elif slot['state']=='held' and slot['session_id']!=session_id:
                 denial='device_busy'
+            elif slot['state']=='free' and not any(
+                mode in compliance['allowed_presence_modes'] and
+                any(mode in auth['allowed_presence_modes']
+                    for auth in policy['controller_authorizations']) and
+                self._grant_works(db,session,gid,mode)
+                for mode in ('autonomous','bridge','totalmersion')
+                for gid in json.loads(session['grant_ids'])
+            ):
+                # A once-prepared Session may have since lost every valid Grant.
+                # Only new acquisitions are blocked; holder re-acquire stays idempotent.
+                denial='no_valid_representation_authority'
             elif slot['state']=='free':
                 if slot['device_epoch']>=2**53-1:
                     raise CoreDenied('device_epoch_exhausted')
