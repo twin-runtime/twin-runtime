@@ -34,6 +34,7 @@ class Watermark:
     controller_id: str | None = None
     lease_valid_until: datetime | None = None
     deadline_mono: float | None = None
+    device_epoch: int | None = None
 
 
 class EdgeFenceState:
@@ -41,6 +42,10 @@ class EdgeFenceState:
 
     `supported_control_domains` is local trusted configuration, not a claim
     made by an unauthenticated remote party. Empty configuration denies all.
+
+    `execution_class` is trusted provisioning for this boot. Only exact
+    "digital" opts out of physical-device fencing. A physical boot accepts
+    authority for one device epoch and Session; transfer is not implemented.
 
     `trusted_wall_clock` MUST return aware UTC datetime when synchronized, or
     None when not trusted. With None, installations and commands fail closed.
@@ -53,6 +58,7 @@ class EdgeFenceState:
         edge_boot_id: str,
         *,
         supported_control_domains: Iterable[str] = (),
+        execution_class: str | None = "physical",
         monotonic_clock: Callable[[], float] = time.monotonic,
         trusted_wall_clock: Callable[[], datetime | None] | None = None,
     ):
@@ -60,6 +66,7 @@ class EdgeFenceState:
             raise ValueError("Edge identity and boot epoch required")
         self.edge_id = edge_id
         self.edge_boot_id = edge_boot_id
+        self._execution_class = "digital" if type(execution_class) is str and execution_class == "digital" else "physical"
         self.supported_control_domains = frozenset(supported_control_domains)
         if any(not isinstance(d, str) or not d for d in self.supported_control_domains):
             raise ValueError("Every declared control domain must be non-empty")
@@ -68,6 +75,26 @@ class EdgeFenceState:
         self._lock = threading.Lock()
         self._marks: dict[tuple[str, str], Watermark] = {}
         self._seen_commands: dict[tuple[str, str], set[str]] = {}
+        self._device_mark: tuple[int, str] | None = None
+
+    @property
+    def execution_class(self) -> str:
+        """Boot-scoped trusted classification; changing it requires a new instance."""
+        return self._execution_class
+
+    def _device_denial(self, device_epoch: int | None, session_id: str) -> str | None:
+        """Check under _lock without changing the boot's device watermark."""
+        if type(device_epoch) is not int or not 1 <= device_epoch <= _MAX_SAFE_INTEGER:
+            return "device_state_unverified"
+        if self._device_mark is not None:
+            previous_epoch, previous_session = self._device_mark
+            if device_epoch < previous_epoch:
+                return "device_epoch_stale"
+            if device_epoch > previous_epoch:
+                return "device_transfer_pending"
+            if session_id != previous_session:
+                return "device_epoch_conflict"
+        return None
 
     def _trusted_now(self) -> datetime | None:
         if self._trusted_wall_clock is None:
@@ -111,6 +138,11 @@ class EdgeFenceState:
         seq = message["installation_sequence"]
         key = (message["session_id"], domain)
         with self._lock:
+            device_epoch = message.get("device_epoch") if self.execution_class == "physical" else None
+            if self.execution_class == "physical":
+                denial = self._device_denial(device_epoch, message["session_id"])
+                if denial is not None:
+                    return False, denial
             previous = self._marks.get(key)
             if previous is None:
                 if seq != 1:
@@ -151,14 +183,19 @@ class EdgeFenceState:
                 ttl = message["max_local_ttl_ms"] / 1000.0
                 mono_now = self._monotonic_clock()
                 deadline = mono_now + min(ttl, remaining)
-                mark = Watermark(gen, seq, kind, message["lease_id"], message["controller_id"], until, deadline)
+                mark = Watermark(gen, seq, kind, message["lease_id"], message["controller_id"], until, deadline,
+                                 device_epoch=device_epoch)
                 if previous is None or gen != previous.generation:
                     self._seen_commands[key] = set()
             else:
                 # Tombstone keeps previous Lease ID only to detect immediate reuse.
                 retired_lease_id = previous.lease_id if previous is not None else None
-                mark = Watermark(gen, seq, kind, retired_lease_id, None)
+                mark = Watermark(gen, seq, kind, retired_lease_id, None, device_epoch=device_epoch)
                 self._seen_commands.pop(key, None)
+            # Pin only after every domain/Lease check succeeds. A revoke can be
+            # the first accepted message, but never installs command authority.
+            if self.execution_class == "physical":
+                self._device_mark = (device_epoch, message["session_id"])
             self._marks[key] = mark
         return True, "accepted"
 
@@ -178,6 +215,12 @@ class EdgeFenceState:
             mark = self._marks.get(key)
             if mark is None:
                 return False, "no_authority"
+            if self.execution_class == "physical":
+                if self._device_mark is None:
+                    return False, "device_state_unverified"
+                denial = self._device_denial(mark.device_epoch, envelope["session_id"])
+                if denial is not None:
+                    return False, denial
             if mark.kind == "edge.authority_revoke":
                 return False, "revoked"
             if envelope["lease_generation"] != mark.generation:
@@ -199,3 +242,8 @@ class EdgeFenceState:
     def snapshot(self, session_id: str, control_domain: str) -> Watermark | None:
         with self._lock:
             return self._marks.get((session_id, control_domain))
+
+    def device_snapshot(self) -> tuple[int, str] | None:
+        """Boot-local fencing watermark, not confirmed physical control."""
+        with self._lock:
+            return self._device_mark

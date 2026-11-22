@@ -93,7 +93,9 @@ class DemoState:
             monotonic_clock=self._monotonic,
             trusted_wall_clock=self._clock,
         )
-        self.core.register_edge(self.edge_id, self.edge_boot_id, ["conversation", "gesture"])
+        # Separate simulated device provisioning from Session Policy controllers.
+        self.core.register_edge(self.edge_id, self.edge_boot_id, ["conversation", "gesture"],
+                                acquire_principal_id="demo-device-admin")
         now = self._clock()
         self.core.provision_grant({
             "grant_id": self.grant_id,
@@ -190,6 +192,7 @@ class DemoState:
                 if status["session_status"] != "ready":
                     raise CoreDenied("demo_already_started")
                 self.core.activate_session(self.session_id, "autonomous")
+                self.core.acquire_device(self.session_id, "demo-device-admin")
                 self.leases = {
                     "conversation": self._lease("ai-agent", "conversation"),
                     "gesture": self._lease("ai-agent", "gesture"),

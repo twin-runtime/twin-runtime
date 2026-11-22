@@ -15,6 +15,7 @@ VALIDATOR = Draft202012Validator(SCHEMA, format_checker=FormatChecker())
 
 def install(generation=11, sequence=1, lease="lease-b", controller="human-1", boot="boot-1", domain="conversation"):
     return dict(kind="edge.authority_install", edge_id="edge-1", edge_boot_id=boot,
+                device_epoch=1,
                 session_id="session-1", control_domain=domain, lease_id=lease,
                 controller_id=controller, generation=generation,
                 installation_sequence=sequence,
@@ -23,6 +24,7 @@ def install(generation=11, sequence=1, lease="lease-b", controller="human-1", bo
 
 def revoke(generation=12, sequence=1, boot="boot-1"):
     return dict(kind="edge.authority_revoke", edge_id="edge-1", edge_boot_id=boot,
+                device_epoch=1,
                 session_id="session-1", control_domain="conversation",
                 generation=generation, installation_sequence=sequence,
                 reason="representation_grant_revoked")
@@ -40,6 +42,18 @@ class TestSchema(unittest.TestCase):
     def test_install_and_revoke(self):
         self.assertTrue(VALIDATOR.is_valid(install()))
         self.assertTrue(VALIDATOR.is_valid(revoke()))
+
+    def test_device_epoch_optional_for_digital_contract(self):
+        for message in (install(), revoke()):
+            message.pop("device_epoch")
+            self.assertTrue(VALIDATOR.is_valid(message))
+
+    def test_registration_execution_class(self):
+        msg = dict(kind="edge.register", edge_id="edge-1", edge_boot_id="boot-1",
+                   supported_control_domains=["conversation"])
+        for execution_class in ("physical", "digital"):
+            self.assertTrue(VALIDATOR.is_valid({**msg, "execution_class": execution_class}))
+        self.assertFalse(VALIDATOR.is_valid({**msg, "execution_class": "unknown"}))
 
     def test_missing_epoch_is_invalid(self):
         msg = install()

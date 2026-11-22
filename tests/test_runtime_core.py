@@ -44,7 +44,8 @@ class TestRuntimeCore(unittest.TestCase):
                                    supported_control_domains=['conversation', 'gesture'],
                                    monotonic_clock=self.clock.monotonic,
                                    trusted_wall_clock=self.clock.wall)
-        self.core.register_edge('edge-1', 'boot-1', ['conversation', 'gesture'])
+        self.core.register_edge('edge-1', 'boot-1', ['conversation', 'gesture'],
+                                acquire_principal_id='device-admin')
         self.core.provision_grant(self.grant())
         self.core.create_session('session-1', 'owner-1', 'twin-1', ['grant-1'], 'edge-1')
         self.core.set_policies('session-1', self.policy(), self.compliance())
@@ -83,8 +84,10 @@ class TestRuntimeCore(unittest.TestCase):
             **overrides,
         }
 
-    def start(self, mode='autonomous'):
+    def start(self, mode='autonomous', *, acquire_device=True):
         self.core.activate_session('session-1',mode,owner_presence_confirmed=mode!='autonomous')
+        if acquire_device:
+            self.core.acquire_device('session-1', 'device-admin')
 
     def lease(self, controller='ai-1', domain='conversation'):
         return self.core.issue_lease('session-1',controller,controller,domain,'grant-1')
@@ -198,7 +201,7 @@ class TestRuntimeCore(unittest.TestCase):
 
     def test_undeclared_edge_domain_is_denied(self):
         # A Grant may include a domain absent from the Edge's trusted capabilities.
-        self.core.register_edge('edge-1','boot-1',['gesture'])
+        self.core.register_edge('edge-1','boot-1',['gesture'],acquire_principal_id='device-admin')
         self.start()
         self.assertReason('domain_unsupported',self.core.issue_lease,
                           'session-1','ai-1','ai-1','conversation','grant-1')
@@ -229,7 +232,8 @@ class TestRuntimeCore(unittest.TestCase):
 
     def test_edge_boot_change_invalidates_core_and_suspends(self):
         self.start('bridge');self.lease('owner-controller');self.pump()
-        self.core.register_edge('edge-1','boot-2',['conversation','gesture'])
+        self.core.register_edge('edge-1','boot-2',['conversation','gesture'],
+                                acquire_principal_id='device-admin')
         self.assertEqual(self.core.active_leases('session-1'),[])
         self.assertEqual(self.core.session_snapshot('session-1')['session_status'],'suspended')
         queued=self.core.pending_edge_updates('edge-1')
@@ -245,12 +249,14 @@ class TestRuntimeCore(unittest.TestCase):
             self.assertTrue(e['correlation_id'])
 
     def test_multi_presence_independent_sessions(self):
+        # Independent Sessions on one Edge are supported only for trusted digital endpoints.
+        self.core.register_edge('edge-1','boot-1',['conversation','gesture'],execution_class='digital')
         self.core.create_session('session-2','owner-1','twin-1',['grant-1'],'edge-1')
         policy2=self.policy();policy2.update(policy_id='policy-2',session_id='session-2')
         compliance2=self.compliance();compliance2.update(policy_id='compliance-2',session_id='session-2')
         self.core.set_policies('session-2',policy2,compliance2)
         self.core.prepare_session('session-2');self.core.activate_session('session-2','autonomous')
-        self.start();a=self.lease()
+        self.start(acquire_device=False);a=self.lease()
         b=self.core.issue_lease('session-2','ai-1','ai-1','conversation','grant-1')
         self.assertEqual(a['generation'],1)
         self.assertEqual(b['generation'],1)
@@ -261,25 +267,26 @@ class TestRuntimeCore(unittest.TestCase):
     def test_schema_definitions_are_valid_draft_2020_12(self):
         import json
         root=Path(__file__).resolve().parents[1]/'spec'/'v0.1'
-        for name in ('session','representation-grant','session-policy','compliance-policy','control-lease','runtime-event'):
+        for name in ('session','representation-grant','session-policy','compliance-policy','control-lease','runtime-event','device-event'):
             Draft202012Validator.check_schema(json.loads((root/f'{name}.schema.json').read_text()))
 
     def test_reused_edge_boot_epoch_is_rejected(self):
-        self.core.register_edge('edge-1','boot-2',['conversation','gesture'])
+        self.core.register_edge('edge-1','boot-2',['conversation','gesture'],
+                                acquire_principal_id='device-admin')
         self.assertReason('edge_boot_epoch_reused',self.core.register_edge,
-                          'edge-1','boot-1',['conversation','gesture'])
+                          'edge-1','boot-1',['conversation','gesture'],acquire_principal_id='device-admin')
 
     def test_capability_manifest_change_fences_active_authority(self):
         self.start()
         self.lease(); self.pump()
-        self.core.register_edge('edge-1','boot-1',['gesture'])
+        self.core.register_edge('edge-1','boot-1',['gesture'],acquire_principal_id='device-admin')
         self.assertEqual(self.core.active_leases('session-1'),[])
         self.assertEqual(self.core.session_snapshot('session-1')['session_status'],'suspended')
 
     def test_wrong_grant_subject_fails_before_session_activation(self):
         with tempfile.TemporaryDirectory() as temp:
             second=RuntimeCore(Path(temp)/'core.sqlite',trusted_clock=self.clock.wall)
-            second.register_edge('edge-x','boot-x',['conversation'])
+            second.register_edge('edge-x','boot-x',['conversation'],acquire_principal_id='device-admin')
             second.provision_grant(self.grant(authorized_subject='other-twin'))
             second.create_session('session-x','owner-1','twin-1',['grant-1'],'edge-x')
             policy=self.policy(); policy.update(policy_id='policy-x',session_id='session-x')

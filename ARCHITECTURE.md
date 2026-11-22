@@ -6,6 +6,50 @@
 
 ---
 
+## C-1 implementation status: acquire-only
+
+[RFC-0004](rfcs/RFC-0004-physical-device-session-exclusivity.md) is Accepted. Its complete lifecycle remains the target; this implementation delivers only explicit acquisition and corresponding Core/Edge enforcement.
+
+| Boundary | Implemented in this slice | Still deferred |
+| --- | --- | --- |
+| Trusted provisioning | One `edge_id` per simulated device; default `physical`; exact `digital` opt-in; separate device acquirer | Hardware identity proof, remote authentication and OEM integration |
+| Core allocation | Durable `free / held / quarantined` slot, `device_epoch`, `BEGIN IMMEDIATE` acquire, holder-only physical Lease issuance | Release, `end_session`, suspended hold timeout and transfer |
+| Edge allocation | One boot-scoped `(device_epoch, session_id)` watermark shared by all domains; Lease-based command binding | Device-wide transfer protocol and authenticated completion ACK |
+| Restart | Durable Core slot; fresh Edge boot invalidates old authority and quarantines a held slot | Full Core restart reconciliation under RFC-0004 Section 6.6 and quarantine recovery |
+| Audit | Device-ordered acquisition, denial, fallback and quarantine records | Physical `effective` event, complete lifecycle/actor audit contract |
+| Identity and observation | Existing Session Policy and per-domain Controller checks | Authenticated Owner-only TotalMersion and read-only observer subscriptions |
+
+### Local acquisition contract
+
+`register_edge(edge_id, edge_boot_id, supported_control_domains, execution_class=None, acquire_principal_id=None)` is a **trusted local provisioning call**. Physical registration requires an explicit, nonempty `acquire_principal_id`. It grants device acquisition only; it does not grant Controller scopes, preemption, release or administrator revocation. Core and Edge execution classes must be configured consistently by the trusted host. A caller's remote `edge.register` declaration is not trusted provisioning, and the optional schema field alone cannot establish that trust.
+
+`acquire_device(session_id, authenticated_principal_id)` requires a ready or active Session, active Session/Compliance policies, a currently valid Representation Grant for at least one allowed Presence Mode, and a principal matching that device's provisioned acquirer. The host must authenticate that principal before the call. Grants and policies remain independently checked for every Lease. Acquisition atomically changes `free` to `held` and increments the durable device epoch; repeating it for the holding Session is idempotent even if its Grant has subsequently expired or been revoked (no new authority is issued). It never preempts another Session.
+
+Core includes `device_epoch` in physical Control Leases and authority install/revoke messages. Edge stores it in the installed Lease watermark, so the existing `command-envelope` needs no new field: the checked Lease ID, generation, Controller, Session and local boot state bind the command to the device epoch. Invalid installations do not reserve the device. A valid revocation retains the device watermark and cannot free it.
+
+| Condition | Reference denial |
+| --- | --- |
+| Physical registration lacks a configured acquirer | `device_acquirer_unconfigured` |
+| Caller does not match the configured acquirer | `device_acquire_not_authorized` |
+| New acquisition without a currently valid Representation Grant | `no_valid_representation_authority` |
+| Physical Lease requested before acquire | `device_not_acquired` |
+| Another Session holds the physical slot | `device_busy` |
+| Quarantined Core slot or physical Edge authority without an epoch | `device_state_unverified` |
+| Edge authority uses a lower device epoch | `device_epoch_stale` |
+| Same Edge epoch, different Session | `device_epoch_conflict` |
+| Higher Edge epoch without an implemented transfer protocol | `device_transfer_pending` |
+| Explicit acquire requested on a digital Edge | `device_slot_not_required` |
+
+An authorized intra-Session fallback to Autonomous keeps the slot and epoch and is correlated with the Session's mode-change event. Session/Domain Lease generations still advance. Owner disconnect suspends the Session under existing behavior; it does not implement an automatic Autonomous fallback or free the device. A held slot remains quarantined even if its Edge is reclassified as digital.
+
+**Operational limitation:** the first holding Session retains the physical slot for this intermediate version. There is no release/recovery API. Core restart preserves the slot but does not verify it with Edge; this does **not** satisfy the full restart/recovery target. Databases without the introduced device schema are rejected with `database_upgrade_required`. No migration or database-reset recovery is supplied.
+
+Digital MultiPresence and independent physical Edges remain separate. The previous test allowing two controlling Sessions on one unclassified Edge now explicitly uses `digital`; physical conflict tests cover the changed behavior. The demos explicitly acquire a simulated physical Edge using `demo-device-admin`, outside their Controller policies. Their temporary-database reset is only a fresh simulation.
+
+No transport, OEM completion, disconnected autonomy, C-2 human concurrency or physical `effective` control is introduced here. The remaining architecture below describes the broader design, not completed implementation guarantees.
+
+---
+
 ## 1. Purpose
 
 Twin Runtime is an open-source runtime for managing human presence across AI systems, digital representations and physical robots.

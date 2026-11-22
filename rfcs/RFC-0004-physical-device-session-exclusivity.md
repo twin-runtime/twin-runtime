@@ -15,9 +15,11 @@
 
 This physical-resource invariant is additional to **one active Controller per Control Domain per Session**. A Deployment may contain sequential controlling Sessions. Different devices and independent digital representations may have concurrent Sessions, subject to separate Identity Owner live-presence constraints (C-2).
 
-**Acceptance means architectural approval, not implementation or physical safety certification.** The MUST/SHOULD requirements in this RFC define the accepted v0.1 target contract. The current Python Core and Edge do **not** yet enforce device-level exclusivity, authenticated Owner-only TotalMersion, or OEM safe-state acknowledgements; these require separate accepted implementation changes and verified tests.
+**Acceptance means architectural approval, not implementation or physical safety certification.** The MUST/SHOULD requirements in this RFC define the accepted v0.1 target contract. The C-1A+ Python reference implements explicit acquisition with a durable device slot and Core/Edge epoch checks. Release, transfer, restart reconciliation, authenticated Owner-only TotalMersion and OEM completion acknowledgements remain deferred. See the [implementation status](../ARCHITECTURE.md#c-1-implementation-status-acquire-only); this partial delivery does not claim full RFC conformance.
 
-## 2. Observed reference gap
+## 2. Observed reference gap before C-1A+
+
+The observations below describe the baseline at `1125772`, before the acquire-only implementation.
 
 - `reference/runtime_core.py` issues and replaces Leases per `(session_id, control_domain)`.
 - `reference/edge_fence.py` records authority per `(session_id, control_domain)`.
@@ -56,7 +58,7 @@ For the **reference physical v0.1** a trusted deployment MUST bind exactly one `
 - Edge execution class MUST come from **trusted provisioning**, not a client claim. A missing, unknown or unverified execution class MUST be treated as `physical` and subject to exclusivity.
 - An explicitly trusted `digital` classification may bypass *physical-device* exclusivity only for an endpoint with no shared physical actuators. Reclassification MUST revoke/fence all dependent active authority and require re-registration.
 - An Edge hosting multiple robots, distributed enforcement endpoints for one robot or a globally federated device registry requires a separate contract and review; it MUST NOT silently claim v0.1 compliance.
-- The reference simulator lacks this execution-class field today; it is not currently a production-deployable physical integration.
+- The acquire-only reference now includes execution-class configuration in Core and Edge; it remains a simulator, not a production-deployable physical integration.
 
 ## 5. Device slot lifecycle and authorization (P0-1)
 
@@ -116,7 +118,7 @@ The Edge needs an authenticated Core-to-Edge control channel and authenticated a
 9. **Owner-only TotalMersion v0.1:** A `totalmersion` Session MUST use only a high-level Controller for whom the trusted host establishes an authenticated, non-delegated binding to that Session's `owner_id`. Core MUST reject activation, mode change, Lease issuance and device-slot use when that binding cannot be verified, with `totalmersion_owner_mismatch`. `set_policies` MUST reject any proposed TotalMersion controller authorization without an authenticated Owner binding. This condition cannot be overridden by the Session Policy, Booking, Grant, employee role or any asserted `owner_presence_confirmed` boolean.
 10. **Identity IDs are not interchangeable:** `controller_id` need not literally equal `owner_id`; the host must prove a trustworthy mapping between authenticated human Controller identity and the represented natural person. Technical heartbeat is not proof of identity or conscious human presence. The host-to-Core proof mechanism, verification lifecycle and Edge confidence boundary require an implementation contract before this condition can be claimed as enforced. Organizational Identity Owners require a separate approved live-delegation design before they can assert personal TotalMersion.
 11. Employee/delegated operator TotalMersion and G-Brain-originated control are **not authorized by this RFC**. Any future support needs a separate Accepted RFC and truthful disclosure of who actually controls the representation.
-12. These requirements **are not implemented today**. The reference Core currently trusts a supplied `owner_presence_confirmed` flag and a policy Controller ID; it does not establish the Owner binding in item 9.
+12. The Owner identity requirements in items 9-11 **are not implemented in C-1A+**. The reference Core currently trusts a supplied `owner_presence_confirmed` flag and a policy Controller ID; it does not establish the Owner binding in item 9.
 
 **C-2 distinction:** This RFC addresses device exclusivity. It does **not** establish that one Identity Owner can genuinely be live in two concurrent TotalMersion Sessions on *different* robots. That separate human-presence exclusivity problem is C-2; do not advertise or infer true simultaneous live presence until C-2 is resolved.
 
@@ -172,7 +174,7 @@ Core MUST maintain a durable, **strictly ordered per-device** transition record.
 
 Core MUST emit correlated per-Session events for affected Sessions. It MUST NOT publish an `effective` device-control event until the corresponding authenticated Edge acknowledgement for the **current** epoch and safe-state prerequisites have been validated.
 
-The current reference Core emits `lease.issued` and `control.handover` before Edge ACK. Those currently describe **Core-side issuance within a Session**, not proven physical effectiveness. The later implementation MUST introduce separate device-scoped events rather than retroactively calling early issuance events physical handover.
+The current reference Core emits `lease.issued` and `control.handover` before Edge ACK. Those describe **Core-side issuance within a Session**, not proven physical effectiveness. C-1A+ adds separate device-scoped `acquired`, `denied`, `fallback` and `quarantined` events. The full lifecycle and actor-audit contract remains incomplete; no `effective` event is emitted.
 
 ## 11. Failure behavior and required implementation regression tests
 
@@ -199,7 +201,7 @@ The current reference Core emits `lease.issued` and `control.handover` before Ed
 | Core issues a Lease before Edge ACK | No physical `effective` event yet |
 | OEM reports in-flight action not safely completed | No successor effective; quarantine or remain pending |
 
-Target denial codes include: `device_busy`, `device_transfer_pending`, `device_epoch_stale`, `device_epoch_conflict`, `device_state_unverified`, `totalmersion_owner_mismatch` and `observation_only_access`. They are **not** yet implemented API errors.
+Target denial codes include: `device_busy`, `device_transfer_pending`, `device_epoch_stale`, `device_epoch_conflict`, `device_state_unverified`, `totalmersion_owner_mismatch` and `observation_only_access`. C-1A+ implements the first five for its acquire-only checks; `device_transfer_pending` rejects a higher epoch and does not implement transfer. `totalmersion_owner_mismatch` and `observation_only_access` remain deferred. The local reference also uses `device_not_acquired` for a physical Lease requested before acquire, plus separate provisioning/acquisition denials documented in [ARCHITECTURE.md](../ARCHITECTURE.md#c-1-implementation-status-acquire-only). These are local reference results, not a published network API.
 
 Tests MUST distinguish simulated reference guarantees from actual robot safety. CI success cannot certify physical hardware.
 

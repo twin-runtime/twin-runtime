@@ -35,6 +35,7 @@ class FakeClock:
 
 def install(gen=11, seq=1, lease="lease-b", controller="human-1", domain="conversation", ttl=1500, boot="boot-1", until="2026-11-09T15:10:00Z"):
     return dict(kind="edge.authority_install", edge_id="edge-1", edge_boot_id=boot,
+                device_epoch=1,
                 session_id="session-1", control_domain=domain, generation=gen,
                 installation_sequence=seq, lease_id=lease, controller_id=controller,
                 lease_valid_until=until, max_local_ttl_ms=ttl)
@@ -42,6 +43,7 @@ def install(gen=11, seq=1, lease="lease-b", controller="human-1", domain="conver
 
 def revoke(gen=12, seq=1):
     return dict(kind="edge.authority_revoke", edge_id="edge-1", edge_boot_id="boot-1",
+                device_epoch=1,
                 session_id="session-1", control_domain="conversation", generation=gen,
                 installation_sequence=seq, reason="policy_changed")
 

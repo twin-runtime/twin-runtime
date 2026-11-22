@@ -15,6 +15,13 @@ It also demonstrates stale-command rejection, simulated Owner disconnect, a
 suspended Session, Edge revocation and ordered audit events. No Twin.rent
 Marketplace is needed.
 
+Both demos explicitly acquire their simulated physical Edge before issuing
+Leases. A separately provisioned `demo-device-admin` principal performs the
+acquire; Controller permissions in Session Policy do not grant this right.
+There is no device release or transfer in the acquire-only slice. The browser
+Reset action creates a fresh isolated temporary database and boot; it must
+not be treated as a way to release or recover a real device.
+
 **Not a production deployment.** Local calls stand in for authenticated Core
 and Controller transports. `owner_presence_confirmed=True` and
 `owner_disconnected(...)` simulate trusted liveness signals; **no actual heartbeat
@@ -22,7 +29,7 @@ or physical presence verification is implemented**. Edge performs no robot
 control or local OEM safety. Cross-host messaging, outbox delivery/ACK identity,
 cryptographic integrity, policy-provider trust and exact physical fallback
 are outside this slice. Remote revocation is not instantaneous if Edge is
-unreachable; Edge enforces bounded local expiry.
+unreachable; the local reference also checks Lease expiry.
 
 Schemas in `spec/v0.1/` describe draft v0.1 Core objects, not a published
 interoperability certification. `reference/runtime_core.py` persists fencing
@@ -80,6 +87,6 @@ uses a demo-only CSRF token. There is no actual user authentication, identity
 verification, robot transport, physical human-presence detection, OEM safety,
 or real command execution. The owner join/disconnect and AI responses are
 scripted, trusted local test signals. Edge Command Check results are kept in
-volatile UI memory, separately from ordered durable Core audit events. Leases
-have bounded local Edge TTL (60 s); after it expires Edge denies commands
-until new authority is issued. Do not expose this server to the internet.
+volatile UI memory, separately from ordered durable Core audit events. The demo
+requests a 60 s local TTL; after a demo Lease expires, commands require newly
+issued authority. Do not expose this server to the internet.
