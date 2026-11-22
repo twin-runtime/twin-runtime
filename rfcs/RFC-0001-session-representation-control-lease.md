@@ -3,7 +3,7 @@
 **Status:** Draft  
 **Target:** Twin Runtime v0.1  
 **Related:** `ARCHITECTURE.md`, `RUNTIME_REQUIREMENTS.md`  
-**Related Draft (not accepted):** [RFC-0004 - Physical-device Session exclusivity](RFC-0004-physical-device-session-exclusivity.md). The additional device-level invariant is proposed only; existing Session-level semantics remain unchanged until an RFC is accepted.
+**Related Accepted RFC:** [RFC-0004 - Physical-device Session exclusivity](RFC-0004-physical-device-session-exclusivity.md), accepted 2026-11-14. It adds a device-level invariant alongside Session/Domain authority. The reference implements the acquire-only subset; full lifecycle, identity and recovery alignment remains staged implementation work.
 
 ---
 

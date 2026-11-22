@@ -137,6 +137,8 @@ An independently addressable instance of presence and interaction.
 
 One Identity Owner may have multiple simultaneous Sessions.
 
+Independent digital Sessions and Sessions on different physical Edges remain supported. A physical Edge must be explicitly acquired by one controlling Session before Core issues its command Leases.
+
 ### Session Policy
 
 Runtime-level permissions and restrictions applied to a specific Session.
@@ -317,6 +319,24 @@ The repository includes an **experimental, single-host reference implementation*
 6. an interactive localhost browser demo.
 
 **Not yet implemented:** authenticated external transports and providers, production-grade access control, actual human-presence verification, robot/OEM integration or physical safety enforcement. Open interfaces and conformance are still evolving; passing tests does not establish production readiness.
+
+### C-1 status: acquire-only reference
+
+This is a partial implementation of [Accepted RFC-0004](rfcs/RFC-0004-physical-device-session-exclusivity.md), tracked in [Issue #6](https://github.com/twin-runtime/twin-runtime/issues/6).
+
+| Area | Current reference behavior |
+| --- | --- |
+| Device classification | Core and Edge default to `physical`; only trusted, exact `digital` configuration bypasses device exclusivity |
+| Device acquisition | Explicit `acquire_device` uses a separately provisioned device principal; Session Policy controller rights alone do not authorize it |
+| Core enforcement | One durable slot and epoch per Edge, serialized acquire, and physical Lease issuance only for the holding Session |
+| Edge enforcement | Install, revoke and command checks bind to one device epoch and Session per boot; cross-Session conflicts are rejected |
+| Retention and quarantine | Mode changes, suspend and revocation retain the slot; a boot, execution-class or acquirer change quarantines a held slot |
+| Device audit | Ordered `acquired`, `denied`, `fallback` and `quarantined` records; no `effective` event |
+| Deferred | Release, transfer, hold timeout, `end_session`, ACK/recovery, full Core restart reconciliation, Owner-only TotalMersion identity binding and observers |
+
+**Temporary limitation:** a physical Edge stays allocated to its first holding Session. There is no release API or recovery from quarantine in this slice. Persisting a slot across a Core restart does not implement the RFC's Core/Edge reconciliation. Existing databases from before C-1A+ are rejected with `database_upgrade_required`; no automatic migration is provided. Do not reset a live device's database to free a slot.
+
+The demos use separate `demo-device-admin` provisioning and call acquire explicitly. Their Reset button creates an isolated temporary simulation; it is not a device-release operation. See the [architecture implementation notes](ARCHITECTURE.md#c-1-implementation-status-acquire-only) for the local API and denial codes. The reference remains a software simulation with no claim of physical control confirmation.
 
 Next milestones: make the demo easy to run and independently review, then prototype an external AI-controller adapter and one independently verifiable robotics/transport integration.
 

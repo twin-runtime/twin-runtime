@@ -27,7 +27,9 @@ def main() -> None:
         edge = EdgeFenceState('edge-demo', 'boot-demo',
                               supported_control_domains=['conversation'],
                               trusted_wall_clock=clock)
-        core.register_edge('edge-demo', 'boot-demo', ['conversation'])
+        # Device acquisition is provisioned separately from Controller scopes.
+        core.register_edge('edge-demo', 'boot-demo', ['conversation'],
+                           acquire_principal_id='demo-device-admin')
 
         core.provision_grant({
             'grant_id':'grant-demo', 'provider_id':'trusted-local-admin',
@@ -77,6 +79,7 @@ def main() -> None:
 
         core.prepare_session('session-demo')
         core.activate_session('session-demo','autonomous')
+        core.acquire_device('session-demo', 'demo-device-admin')
         ai_lease=core.issue_lease('session-demo','ai-agent','ai-agent','conversation','grant-demo')
         sync_edge()
         print('1. Autonomous: AI command ->', command(ai_lease, 'ai-agent'))
