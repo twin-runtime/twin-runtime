@@ -4,6 +4,7 @@ These tests establish simulated authorization behavior, not OEM completion or
 Core/Edge restart reconciliation.
 """
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
 import multiprocessing
 import sqlite3
 import threading
@@ -356,11 +357,11 @@ class TestDeviceExclusivity(unittest.TestCase):
 
     def test_legacy_database_fails_closed_without_silent_migration(self):
         path = self.path.with_name("legacy.sqlite")
-        with sqlite3.connect(path) as db:
+        with closing(sqlite3.connect(path)) as db, db:
             db.execute("CREATE TABLE edges (edge_id TEXT PRIMARY KEY, boot_id TEXT NOT NULL, domains TEXT NOT NULL)")
             db.execute("INSERT INTO edges VALUES ('edge-old', 'boot-old', '[\"conversation\"]')")
         self.assertReason("database_upgrade_required", RuntimeCore, path, trusted_clock=self.clock.wall)
-        with sqlite3.connect(path) as db:
+        with closing(sqlite3.connect(path)) as db, db:
             self.assertEqual([row[1] for row in db.execute("PRAGMA table_info(edges)")],
                              ["edge_id", "boot_id", "domains"])
             self.assertEqual(db.execute("SELECT edge_id FROM edges").fetchall(), [("edge-old",)])
@@ -369,24 +370,24 @@ class TestDeviceExclusivity(unittest.TestCase):
     def test_missing_device_table_is_not_recreated_on_restart(self):
         self.start()
         self.lease()
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db, db:
             db.execute("DROP TABLE device_slots")
         self.assertReason("database_upgrade_required", RuntimeCore, self.path,
                           trusted_clock=self.clock.wall)
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db, db:
             self.assertEqual(db.execute("SELECT name FROM sqlite_master WHERE name='device_slots'").fetchall(), [])
             self.assertEqual(db.execute("SELECT COUNT(*) FROM leases").fetchone()[0], 1)
 
     def test_missing_device_slot_is_not_reset_by_reregistration(self):
         self.start()
         self.lease()
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db, db:
             db.execute("DELETE FROM device_slots WHERE edge_id='edge-1'")
         self.assertReason("unknown_device_slot", self.core.register_edge,
                           "edge-1", "boot-2", ["conversation", "gesture"],
                           acquire_principal_id="device-admin")
         self.assertReason("unknown_device_slot", self.core.acquire_device, "session-1", "device-admin")
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db, db:
             self.assertEqual(db.execute("SELECT COUNT(*) FROM device_slots").fetchone()[0], 0)
             self.assertEqual(db.execute("SELECT boot_id FROM edges WHERE edge_id='edge-1'").fetchone()[0], "boot-1")
 
@@ -396,7 +397,7 @@ class TestDeviceExclusivity(unittest.TestCase):
         slot = self.core.device_slot("edge-1")
         events = self.core.device_events("edge-1")
         updates = self.core.pending_edge_updates("edge-1")
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db, db:
             db.execute("DELETE FROM edges WHERE edge_id='edge-1'")
         self.assertReason("device_state_unverified", self.core.register_edge,
                           "edge-1", "boot-2", ["conversation", "gesture"],
@@ -406,7 +407,7 @@ class TestDeviceExclusivity(unittest.TestCase):
         self.assertEqual(self.core.device_events("edge-1"), events)
         self.assertEqual(self.core.active_leases("session-1"), [lease])
         self.assertEqual(self.core.pending_edge_updates("edge-1"), updates)
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db, db:
             self.assertEqual(db.execute("SELECT edge_id FROM edges WHERE edge_id='edge-1'").fetchall(), [])
             self.assertEqual(db.execute("SELECT boot_id FROM edge_boot_history WHERE edge_id='edge-1'").fetchall(),
                              [("boot-1",)])
