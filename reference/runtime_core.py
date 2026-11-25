@@ -17,12 +17,14 @@ from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 import sqlite3
+import threading
 from typing import Callable, Iterator
 from uuid import uuid4
 
 from jsonschema import Draft202012Validator
 
 from .schema_validation import required_format_checker
+from .core_ownership import CoreOwnership, OwnershipError, canonical_database
 
 _SCHEMA_DIR = Path(__file__).resolve().parents[1] / "spec" / "v0.1"
 _VALIDATORS = {
@@ -71,14 +73,40 @@ class RuntimeCore:
     a reboot must never reset authority generation. The wall clock is a trusted
     test/host input; Edge separately checks its installed authority using a
     monotonic clock. Device acquisition is a reference acquire-only subset;
-    release, transfer and restart reconciliation are not implemented.
+    release and transfer are not implemented. Restart conservatively quarantines
+    retained physical authority; authenticated reconciliation remains deferred.
     """
 
     def __init__(self, db_path: str | Path, *, trusted_clock: Callable[[], datetime] = _utc_now):
-        self.db_path = str(db_path)
-        if self.db_path == ":memory:":
-            raise ValueError("Persistent SQLite database required for Core fencing")
+        self._operation_lock = threading.RLock()
         self._clock = trusted_clock
+        try:
+            database = canonical_database(db_path)
+            self.db_path = str(database)
+            self._ownership = CoreOwnership(database)
+        except OwnershipError as error:
+            raise CoreDenied(error.reason) from error
+        try:
+            self._initialize_store()
+        except BaseException:
+            self.close()
+            raise
+
+    def __enter__(self) -> RuntimeCore:
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        self.close()
+
+    def close(self) -> None:
+        """Release ownership only after the current transaction has stopped."""
+        with self._operation_lock:
+            try:
+                self._ownership.close()
+            except OwnershipError as error:
+                raise CoreDenied(error.reason) from error
+
+    def _initialize_store(self) -> None:
         with self._transaction() as db:
             # Check before any DDL: old or incomplete stores must not silently
             # gain empty device state while retaining previously issued Leases.
@@ -159,20 +187,46 @@ class RuntimeCore:
             for statement in schema_sql.split(";"):
                 if statement.strip():
                     db.execute(statement)
+            self._quarantine_retained_authority(db)
+
+    def _quarantine_retained_authority(self, db: sqlite3.Connection) -> None:
+        # No persisted physical holder is verified merely by opening its database.
+        # Do not deliver retained authority installations after restart.
+        slots = db.execute("SELECT * FROM device_slots WHERE state!='free'").fetchall()
+        for slot in slots:
+            edge_id = slot["edge_id"]
+            corr = "operation_" + uuid4().hex
+            self._need(db.execute("SELECT * FROM edges WHERE edge_id=?", (edge_id,)).fetchone(), "edge")
+            for row in db.execute("SELECT update_id,payload FROM edge_outbox WHERE edge_id=? AND acknowledged=0",
+                                  (edge_id,)).fetchall():
+                if json.loads(row["payload"])["kind"] == "edge.authority_install":
+                    db.execute("UPDATE edge_outbox SET acknowledged=1 WHERE update_id=?", (row["update_id"],))
+            if slot["state"] != "quarantined":
+                db.execute("UPDATE device_slots SET state='quarantined',reason=?,updated_at=? WHERE edge_id=?",
+                           ("core_restarted", _stamp(self._now()), edge_id))
+                self._device_audit(db, edge_id, "quarantined", "core_restarted", corr,
+                                   session_id=slot["session_id"])
+            for session in db.execute("SELECT * FROM sessions WHERE edge_id=?", (edge_id,)).fetchall():
+                self._suspend(db, session, "core_restarted", corr)
 
     @contextmanager
     def _transaction(self) -> Iterator[sqlite3.Connection]:
-        db = sqlite3.connect(self.db_path, timeout=10)
-        db.row_factory = sqlite3.Row
-        try:
-            db.execute("BEGIN IMMEDIATE")
-            yield db
-            db.commit()
-        except Exception:
-            db.rollback()
-            raise
-        finally:
-            db.close()
+        with self._operation_lock:
+            try:
+                self._ownership.require()
+            except OwnershipError as error:
+                raise CoreDenied(error.reason) from error
+            db = sqlite3.connect(self.db_path, timeout=10)
+            db.row_factory = sqlite3.Row
+            try:
+                db.execute("BEGIN IMMEDIATE")
+                yield db
+                db.commit()
+            except BaseException:
+                db.rollback()
+                raise
+            finally:
+                db.close()
 
     def _now(self) -> datetime:
         now = self._clock()

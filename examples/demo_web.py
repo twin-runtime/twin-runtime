@@ -67,11 +67,13 @@ class DemoState:
     def close(self) -> None:
         with self._lock:
             if self._temporary is not None:
+                self.core.close()
                 self._temporary.cleanup()
                 self._temporary = None
 
     def _new_demo(self) -> None:
         if self._temporary is not None:
+            self.core.close()
             self._temporary.cleanup()
         self._temporary = tempfile.TemporaryDirectory(prefix="twin-runtime-web-")
         self.core = RuntimeCore(Path(self._temporary.name) / "runtime.sqlite", trusted_clock=self._clock)
