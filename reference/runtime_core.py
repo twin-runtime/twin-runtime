@@ -20,12 +20,14 @@ import sqlite3
 from typing import Callable, Iterator
 from uuid import uuid4
 
-from jsonschema import Draft202012Validator, FormatChecker
+from jsonschema import Draft202012Validator
+
+from .schema_validation import required_format_checker
 
 _SCHEMA_DIR = Path(__file__).resolve().parents[1] / "spec" / "v0.1"
 _VALIDATORS = {
     kind: Draft202012Validator(json.loads((_SCHEMA_DIR / f"{kind}.schema.json").read_text()),
-                                 format_checker=FormatChecker())
+                                 format_checker=required_format_checker())
     for kind in ("session", "representation-grant", "session-policy",
                  "compliance-policy", "control-lease", "runtime-event", "device-event")
 }
@@ -269,23 +271,50 @@ class RuntimeCore:
         a caller-supplied string is not proof of authentication.
         """
         if not isinstance(authenticated_principal_id,str) or not authenticated_principal_id:
+            # Preserve pre-auth denial precedence. Known devices can still
+            # receive a durable denial event; an unknown Session cannot.
+            with self._transaction() as db:
+                known = db.execute(
+                    "SELECT edge_id FROM sessions WHERE session_id=?",
+                    (session_id,)
+                ).fetchone() if isinstance(session_id,str) else None
+                if known is not None:
+                    edge_id = known['edge_id']
+                    slot = db.execute(
+                        "SELECT session_id FROM device_slots WHERE edge_id=?", (edge_id,)
+                    ).fetchone()
+                    edge = db.execute(
+                        "SELECT 1 FROM edges WHERE edge_id=?", (edge_id,)
+                    ).fetchone()
+                    if slot is not None and edge is not None:
+                        self._device_audit(
+                            db, edge_id, 'denied', 'principal_not_authenticated',
+                            'operation_'+uuid4().hex, session_id=session_id,
+                            prior_session_id=slot['session_id']
+                        )
             raise CoreDenied('principal_not_authenticated')
         denial=None
         result=None
         with self._transaction() as db:
             session=self._session(db,session_id)
-            policy=self._policy(db,'session_policy',session['policy_id'],session['policy_version'])
-            compliance=self._policy(db,'compliance_policy',session['compliance_id'],session['compliance_version'])
             edge=self._need(db.execute('SELECT * FROM edges WHERE edge_id=?',
                                        (session['edge_id'],)).fetchone(),'edge')
             slot=self._need(db.execute('SELECT * FROM device_slots WHERE edge_id=?',
                                        (session['edge_id'],)).fetchone(),'device_slot')
+            # Retain denials on the known device, even when Policy checks fail.
+            try:
+                policy=self._policy(db,'session_policy',session['policy_id'],session['policy_version'])
+                compliance=self._policy(db,'compliance_policy',session['compliance_id'],session['compliance_version'])
+            except CoreDenied as error:
+                denial=error.reason
             # A class change cannot turn a quarantined physical slot into an
             # unrestricted digital endpoint.
-            if slot['state'] not in ('free', 'held'):
+            if denial is not None:
+                pass  # A Policy denial already takes precedence.
+            elif slot['state'] not in ('free', 'held'):
                 denial='device_state_unverified'
             elif edge['execution_class']=='digital':
-                raise CoreDenied('device_slot_not_required')
+                denial='device_slot_not_required'
             elif not edge['acquire_principal_id'] or edge['acquire_principal_id']!=authenticated_principal_id:
                 denial='device_acquire_not_authorized'
             elif session['status'] not in ('ready','active'):

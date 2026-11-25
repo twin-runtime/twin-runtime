@@ -14,15 +14,17 @@ import threading
 import time
 from typing import Callable, Iterable
 
-from jsonschema import Draft202012Validator, FormatChecker
+from jsonschema import Draft202012Validator
+
+from .schema_validation import required_format_checker
 
 
 _MAX_SAFE_INTEGER = 2**53 - 1
 _SCHEMA_DIR = Path(__file__).resolve().parents[1] / "spec" / "v0.1"
 _COMMAND_SCHEMA = json.loads((_SCHEMA_DIR / "command-envelope.schema.json").read_text())
 _EDGE_SCHEMA = json.loads((_SCHEMA_DIR / "edge-authority.schema.json").read_text())
-_COMMAND_VALIDATOR = Draft202012Validator(_COMMAND_SCHEMA, format_checker=FormatChecker())
-_EDGE_VALIDATOR = Draft202012Validator(_EDGE_SCHEMA, format_checker=FormatChecker())
+_COMMAND_VALIDATOR = Draft202012Validator(_COMMAND_SCHEMA, format_checker=required_format_checker())
+_EDGE_VALIDATOR = Draft202012Validator(_EDGE_SCHEMA, format_checker=required_format_checker())
 
 
 @dataclass(frozen=True)
