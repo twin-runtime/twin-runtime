@@ -347,14 +347,13 @@ class TestDeviceExclusivity(unittest.TestCase):
         self.assertEqual(statuses.count("acquired"), 1)
         self.assertIn("fallback", statuses)
 
-    def test_suspend_disconnect_revoke_do_not_release_slot(self):
+    def test_suspend_retains_slot_until_all_grants_lost(self):
         self.start("totalmersion")
         self.second_session()
         operations = [
             lambda: self.core.owner_disconnected("session-1"),
             lambda: self.core.revoke_session_control("session-1"),
             lambda: self.core.set_policies("session-1", self.policy(version="2"), self.compliance()),
-            lambda: self.core.revoke_grant("grant-1"),
         ]
         for operation in operations:
             if self.core.session_snapshot("session-1")["session_status"] == "suspended":
@@ -363,6 +362,9 @@ class TestDeviceExclusivity(unittest.TestCase):
             operation()
             self.assert_held()
             self.assertReason("device_busy", self.core.acquire_device, "session-2", "device-admin")
+        self.core.revoke_grant("grant-1")
+        self.assertEqual(self.core.device_slot("edge-1")["state"], "transferring")
+        self.assertReason("device_transfer_pending", self.core.acquire_device, "session-2", "device-admin")
 
     def test_lease_expiry_does_not_release_slot(self):
         self.start()

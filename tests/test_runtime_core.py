@@ -183,7 +183,8 @@ class TestRuntimeCore(unittest.TestCase):
         self.assertEqual(self.core.session_snapshot('session-1')['session_status'],'suspended')
         self.assertEqual(self.core.active_leases('session-1'),[])
         self.assertEqual(self.edge.check_command(self.command(lease),'ai-1')[0],False)
-        self.assertReason('no_valid_representation_authority',self.core.activate_session,'session-1','autonomous')
+        self.assertEqual(self.core.device_slot('edge-1')['state'],'transferring')
+        self.assertReason('device_transfer_pending',self.core.activate_session,'session-1','autonomous')
 
     def test_policy_change_revokes_all_leases_and_policy_version_immutable(self):
         self.start()
@@ -320,9 +321,10 @@ class TestRuntimeCore(unittest.TestCase):
     def test_grant_expiration_blocks_new_lease_even_if_session_is_active(self):
         self.start()
         self.clock.advance(31*60)
-        self.assertReason('grant_inactive_or_expired',self.core.issue_lease,
+        self.assertReason('device_transfer_pending',self.core.issue_lease,
                           'session-1','ai-1','ai-1','conversation','grant-1')
         self.assertEqual(self.core.active_leases('session-1'),[])
+        self.assertEqual(self.core.device_slot('edge-1')['reason'],'all_supporting_grants_lost')
 
     def test_unknown_grant_restrictions_fail_closed_at_provisioning(self):
         grant=self.grant(grant_id='grant-other',restrictions={'unknown_scope':True})
