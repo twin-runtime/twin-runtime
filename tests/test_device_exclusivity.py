@@ -511,6 +511,100 @@ class TestDeviceExclusivity(unittest.TestCase):
             self.assertEqual(db.execute("SELECT boot_id FROM edge_boot_history WHERE edge_id='edge-1'").fetchall(),
                              [("boot-1",)])
 
+    def test_unauthenticated_acquire_is_audited_for_known_device(self):
+        self.start(acquire_device=False)
+        for principal in (None, ""):
+            with self.subTest(principal=principal):
+                self.assertReason("principal_not_authenticated", self.core.acquire_device,
+                                  "session-1", principal)
+        events = self.core.device_events("edge-1")
+        self.assertEqual([(e["status"], e["reason"]) for e in events],
+                         [("denied", "principal_not_authenticated")] * 2)
+        self.assertEqual([e["device_sequence"] for e in events], [1, 2])
+        self.assertEqual(self.core.device_slot("edge-1")["state"], "free")
+
+    def test_missing_policy_acquire_denial_is_audited(self):
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute("DELETE FROM policies WHERE kind='session_policy' AND policy_id='policy-1'")
+        self.assertReason("missing_session_policy", self.core.acquire_device,
+                          "session-1", "device-admin")
+        self.assertEqual([(e["status"], e["reason"]) for e in self.core.device_events("edge-1")],
+                         [("denied", "missing_session_policy")])
+        self.assertEqual(self.core.device_slot("edge-1")["state"], "free")
+
+    def test_digital_acquire_denial_is_audited(self):
+        self.core.register_edge("edge-1", "boot-1", ["conversation", "gesture"],
+                                execution_class="digital")
+        self.assertReason("device_slot_not_required", self.core.acquire_device,
+                          "session-1", "device-admin")
+        self.assertEqual([(e["status"], e["reason"]) for e in self.core.device_events("edge-1")],
+                         [("denied", "device_slot_not_required")])
+        self.assertEqual(self.core.device_slot("edge-1")["state"], "free")
+
+    def test_failed_edge_reboot_rolls_back_quarantine_and_boot_history(self):
+        self.start()
+        lease_before = self.lease()
+        slot_before = self.core.device_slot("edge-1")
+        audit_before = self.core.device_events("edge-1")
+        outbox_before = self.core.pending_edge_updates("edge-1")
+        with patch.object(self.core, "_device_audit", side_effect=RuntimeError("audit unavailable")):
+            with self.assertRaisesRegex(RuntimeError, "audit unavailable"):
+                self.core.register_edge("edge-1", "boot-2", ["conversation", "gesture"],
+                                        acquire_principal_id="device-admin")
+        self.assertEqual(self.core.device_slot("edge-1"), slot_before)
+        self.assertEqual(self.core.device_events("edge-1"), audit_before)
+        self.assertEqual(self.core.pending_edge_updates("edge-1"), outbox_before)
+        self.assertEqual(self.core.session_snapshot("session-1")["session_status"], "active")
+        self.assertEqual(self.core.active_leases("session-1"), [lease_before])
+        with closing(sqlite3.connect(self.path)) as db:
+            self.assertEqual(db.execute("SELECT boot_id FROM edges WHERE edge_id='edge-1'").fetchone()[0],
+                             "boot-1")
+            self.assertEqual(db.execute("SELECT boot_id FROM edge_boot_history WHERE edge_id='edge-1'").fetchall(),
+                             [("boot-1",)])
+        # A new Lease after the aborted registration still targets the old boot.
+        lease_after = self.lease()
+        self.assertEqual(lease_after["device_epoch"], 1)
+        fresh_edge = EdgeFenceState(
+            "edge-1", "boot-2", supported_control_domains=["conversation", "gesture"],
+            monotonic_clock=self.clock.monotonic, trusted_wall_clock=self.clock.wall
+        )
+        installs = [msg for _, msg in self.core.pending_edge_updates("edge-1")
+                    if msg["kind"] == "edge.authority_install"
+                    and msg["lease_id"] == lease_after["lease_id"]]
+        self.assertEqual(len(installs), 1)
+        self.assertEqual(fresh_edge.install_authority(installs[0]), (False, "wrong_edge_epoch"))
+
+    def test_failed_suspend_during_reboot_rolls_back_all_mutations(self):
+        self.start("bridge")
+        lease = self.lease("owner-controller")
+        slot_before = self.core.device_slot("edge-1")
+        events_before = self.core.events("session-1")
+        audit_before = self.core.device_events("edge-1")
+        outbox_before = self.core.pending_edge_updates("edge-1")
+        with patch.object(self.core, "_audit", side_effect=RuntimeError("session audit unavailable")):
+            with self.assertRaisesRegex(RuntimeError, "session audit unavailable"):
+                self.core.register_edge("edge-1", "boot-2", ["conversation", "gesture"],
+                                        acquire_principal_id="device-admin")
+        self.assertEqual(self.core.device_slot("edge-1"), slot_before)
+        self.assertEqual(self.core.events("session-1"), events_before)
+        self.assertEqual(self.core.device_events("edge-1"), audit_before)
+        self.assertEqual(self.core.pending_edge_updates("edge-1"), outbox_before)
+        self.assertEqual(self.core.session_snapshot("session-1")["session_status"], "active")
+        self.assertEqual(self.core.active_leases("session-1"), [lease])
+
+    def test_non_holder_active_bridge_has_no_physical_control(self):
+        # P2-1: active is logical Session state, not effective physical control.
+        # Whether to prevent activation without a slot remains a C-1D decision.
+        self.start("bridge")
+        grant_id = self.second_session(active=False)
+        self.core.activate_session("session-2", "bridge", owner_presence_confirmed=True)
+        self.assertEqual(self.core.session_snapshot("session-2")["session_status"], "active")
+        self.assertReason("device_busy", self.core.issue_lease,
+                          "session-2", "owner-controller", "owner-controller",
+                          "conversation", grant_id)
+        self.assertEqual(self.core.active_leases("session-2"), [])
+        self.assert_held()
+
 
 if __name__ == "__main__":
     unittest.main()
