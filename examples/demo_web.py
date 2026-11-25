@@ -67,11 +67,13 @@ class DemoState:
     def close(self) -> None:
         with self._lock:
             if self._temporary is not None:
+                self.core.close()
                 self._temporary.cleanup()
                 self._temporary = None
 
     def _new_demo(self) -> None:
         if self._temporary is not None:
+            self.core.close()
             self._temporary.cleanup()
         self._temporary = tempfile.TemporaryDirectory(prefix="twin-runtime-web-")
         self.core = RuntimeCore(Path(self._temporary.name) / "runtime.sqlite", trusted_clock=self._clock)
@@ -181,10 +183,23 @@ class DemoState:
         self.command_checks = self.command_checks[:14]
         self.last_command = check
 
+    def tick(self) -> None:
+        with self._lock:
+            if self._temporary is None:
+                return
+            try:
+                self.core.process_lifecycle_deadlines()
+            except CoreDenied as error:
+                if error.reason != "clock_untrusted":
+                    raise
+            self._sync_edge()
+
     def perform(self, action: str) -> dict:
         if action not in _ACTIONS:
             raise CoreDenied("unknown_demo_action")
         with self._lock:
+            if action != "reset":
+                self.tick()
             status = self.core.session_snapshot(self.session_id)
             if action == "reset":
                 self._new_demo()
@@ -257,6 +272,7 @@ class DemoState:
 
     def snapshot(self) -> dict:
         with self._lock:
+            self.tick()
             session = self.core.session_snapshot(self.session_id)
             active = {x["control_domain"]: x for x in self.core.active_leases(self.session_id)}
             domains = []
@@ -374,11 +390,16 @@ def main() -> None:
     if not 0 <= args.port <= 65535:
         parser.error("port must be between 0 and 65535")
     service = DemoState()
+
+    class LifecycleDemoServer(ThreadingHTTPServer):
+        def service_actions(self) -> None:
+            service.tick()
+
     try:
-        with ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(service)) as server:
+        with LifecycleDemoServer(("127.0.0.1", args.port), make_handler(service)) as server:
             print(f"Twin Runtime simulated web demo: http://127.0.0.1:{server.server_port}", flush=True)
             print("Local simulation only. No authenticated user / live robot / OEM safety.", flush=True)
-            server.serve_forever(poll_interval=0.1)
+            server.serve_forever(poll_interval=0.5)
     except KeyboardInterrupt:
         pass
     finally:

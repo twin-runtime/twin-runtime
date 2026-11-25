@@ -40,6 +40,7 @@ class TestRuntimeCore(unittest.TestCase):
         self.path = Path(self.tmp.name) / 'core.sqlite'
         self.clock = FakeClock()
         self.core = RuntimeCore(self.path, trusted_clock=self.clock.wall)
+        self.addCleanup(self.core.close)
         self.edge = EdgeFenceState('edge-1', 'boot-1',
                                    supported_control_domains=['conversation', 'gesture'],
                                    monotonic_clock=self.clock.monotonic,
@@ -182,7 +183,8 @@ class TestRuntimeCore(unittest.TestCase):
         self.assertEqual(self.core.session_snapshot('session-1')['session_status'],'suspended')
         self.assertEqual(self.core.active_leases('session-1'),[])
         self.assertEqual(self.edge.check_command(self.command(lease),'ai-1')[0],False)
-        self.assertReason('no_valid_representation_authority',self.core.activate_session,'session-1','autonomous')
+        self.assertEqual(self.core.device_slot('edge-1')['state'],'transferring')
+        self.assertReason('device_transfer_pending',self.core.activate_session,'session-1','autonomous')
 
     def test_policy_change_revokes_all_leases_and_policy_version_immutable(self):
         self.start()
@@ -221,14 +223,17 @@ class TestRuntimeCore(unittest.TestCase):
         self.core.set_policies('session-1',self.policy(),self.compliance(version='2',allowed_presence_modes=['autonomous','bridge']))
         self.assertReason('compliance_mode_denied',self.core.activate_session,'session-1','totalmersion',owner_presence_confirmed=True)
 
-    def test_core_restart_does_not_reset_generation(self):
+    def test_core_restart_quarantines_and_advances_revoked_generation(self):
         self.start()
         first=self.lease();self.pump()
-        after_restart=RuntimeCore(self.path,trusted_clock=self.clock.wall)
-        after_restart.change_mode('session-1','bridge',owner_presence_confirmed=True)
-        second=after_restart.issue_lease('session-1','owner-controller','owner-controller','conversation','grant-1')
-        self.assertGreater(second['generation'],first['generation'])
-        self.assertEqual(after_restart.events('session-1')[-1]['event_type'],'lease.issued')
+        self.core.close()
+        with RuntimeCore(self.path,trusted_clock=self.clock.wall) as after_restart:
+            self.assertEqual(after_restart.device_slot('edge-1')['state'],'quarantined')
+            self.assertEqual(after_restart.active_leases('session-1'),[])
+            self.assertReason('device_state_unverified',after_restart.issue_lease,
+                              'session-1','ai-1','ai-1','conversation','grant-1')
+            revocations=[e for e in after_restart.events('session-1') if e['event_type']=='lease.revoked']
+            self.assertGreater(revocations[-1]['data']['revoke_generation'],first['generation'])
 
     def test_edge_boot_change_invalidates_core_and_suspends(self):
         self.start('bridge');self.lease('owner-controller');self.pump()
@@ -284,8 +289,8 @@ class TestRuntimeCore(unittest.TestCase):
         self.assertEqual(self.core.session_snapshot('session-1')['session_status'],'suspended')
 
     def test_wrong_grant_subject_fails_before_session_activation(self):
-        with tempfile.TemporaryDirectory() as temp:
-            second=RuntimeCore(Path(temp)/'core.sqlite',trusted_clock=self.clock.wall)
+        with tempfile.TemporaryDirectory() as temp, RuntimeCore(
+                Path(temp)/'core.sqlite',trusted_clock=self.clock.wall) as second:
             second.register_edge('edge-x','boot-x',['conversation'],acquire_principal_id='device-admin')
             second.provision_grant(self.grant(authorized_subject='other-twin'))
             second.create_session('session-x','owner-1','twin-1',['grant-1'],'edge-x')
@@ -316,9 +321,10 @@ class TestRuntimeCore(unittest.TestCase):
     def test_grant_expiration_blocks_new_lease_even_if_session_is_active(self):
         self.start()
         self.clock.advance(31*60)
-        self.assertReason('grant_inactive_or_expired',self.core.issue_lease,
+        self.assertReason('device_transfer_pending',self.core.issue_lease,
                           'session-1','ai-1','ai-1','conversation','grant-1')
         self.assertEqual(self.core.active_leases('session-1'),[])
+        self.assertEqual(self.core.device_slot('edge-1')['reason'],'all_supporting_grants_lost')
 
     def test_unknown_grant_restrictions_fail_closed_at_provisioning(self):
         grant=self.grant(grant_id='grant-other',restrictions={'unknown_scope':True})

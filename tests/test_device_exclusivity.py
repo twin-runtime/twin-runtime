@@ -17,13 +17,15 @@ from reference.edge_fence import EdgeFenceState
 import test_runtime_core as fixtures
 
 
-def _acquire_from_process(path, session_id, start, results):
-    """Spawn-compatible worker: separate Core process, shared durable store."""
-    core = RuntimeCore(path, trusted_clock=lambda: fixtures.BASE)
+def _acquire_from_process(path, session_id, start, results, release):
+    """Competing spawn-compatible Core startups; winner retains ownership."""
     start.wait(timeout=10)
     try:
-        core.acquire_device(session_id, "device-admin")
-        results.put((session_id, "acquired"))
+        with RuntimeCore(path, trusted_clock=lambda: fixtures.BASE) as core:
+            core.acquire_device(session_id, "device-admin")
+            results.put((session_id, "acquired"))
+            if not release.wait(timeout=25):
+                raise RuntimeError("test did not release Core")
     except CoreDenied as error:
         results.put((session_id, error.reason))
 
@@ -182,10 +184,11 @@ class TestDeviceExclusivity(unittest.TestCase):
         slot = self.core.device_slot("edge-1")
         self.assertEqual((slot["state"], slot["device_epoch"]), ("free", 0))
 
-    def test_concurrent_acquire_two_core_instances_single_holder(self):
+    def test_concurrent_acquire_one_core_single_holder(self):
         self.start(acquire_device=False)
         self.second_session()
-        other_core = RuntimeCore(self.path, trusted_clock=self.clock.wall)
+        self.assertReason("core_already_running", RuntimeCore, self.path,
+                          trusted_clock=self.clock.wall)
         start = threading.Barrier(2)
 
         def acquire(core, session_id):
@@ -198,7 +201,7 @@ class TestDeviceExclusivity(unittest.TestCase):
 
         with ThreadPoolExecutor(max_workers=2) as executor:
             futures = [executor.submit(acquire, self.core, "session-1"),
-                       executor.submit(acquire, other_core, "session-2")]
+                       executor.submit(acquire, self.core, "session-2")]
             results = [future.result(timeout=15) for future in futures]
         self.assertCountEqual([status for _, status in results], ["acquired", "device_busy"])
         holder = next(session for session, status in results if status == "acquired")
@@ -209,24 +212,30 @@ class TestDeviceExclusivity(unittest.TestCase):
     def test_concurrent_acquire_separate_processes_single_holder(self):
         self.start(acquire_device=False)
         self.second_session()
+        self.core.close()
         context = multiprocessing.get_context("spawn")
-        start, results_queue = context.Barrier(2), context.Queue()
+        start, results_queue, release = context.Barrier(2), context.Queue(), context.Event()
         processes = [
             context.Process(target=_acquire_from_process,
-                            args=(str(self.path), session, start, results_queue))
+                            args=(str(self.path), session, start, results_queue, release))
             for session in ("session-1", "session-2")
         ]
         try:
             for process in processes:
                 process.start()
             results = [results_queue.get(timeout=20) for _ in processes]
+            self.assertCountEqual([status for _, status in results], ["acquired", "core_already_running"])
+            holder = next(session for session, status in results if status == "acquired")
+            release.set()
             for process in processes:
                 process.join(timeout=10)
                 self.assertEqual(process.exitcode, 0)
-            self.assertCountEqual([status for _, status in results], ["acquired", "device_busy"])
-            holder = next(session for session, status in results if status == "acquired")
-            self.assert_held(holder)
+            with RuntimeCore(self.path, trusted_clock=self.clock.wall) as restarted:
+                slot = restarted.device_slot("edge-1")
+                self.assertEqual((slot["state"], slot["session_id"], slot["device_epoch"]),
+                                 ("quarantined", holder, 1))
         finally:
+            release.set()
             for process in processes:
                 if process.pid is not None:
                     if process.is_alive():
@@ -235,6 +244,14 @@ class TestDeviceExclusivity(unittest.TestCase):
                     process.close()
             results_queue.close()
             results_queue.join_thread()
+
+    def test_same_process_alias_and_closed_core_denied(self):
+        self.assertReason("core_already_running", RuntimeCore, self.path.parent / "." / self.path.name,
+                          trusted_clock=self.clock.wall)
+        self.core.close()
+        self.assertReason("core_closed", self.core.device_slot, "edge-1")
+        with RuntimeCore(self.path, trusted_clock=self.clock.wall) as restarted:
+            self.assertEqual(restarted.device_slot("edge-1")["state"], "free")
 
     def test_acquire_rolls_back_if_device_audit_raises(self):
         with patch.object(self.core, "_device_audit", side_effect=RuntimeError("audit unavailable")):
@@ -297,12 +314,18 @@ class TestDeviceExclusivity(unittest.TestCase):
     def test_slot_and_epoch_survive_core_restart(self):
         self.start()
         self.second_session()
+        self.lease()
         before = self.core.device_slot("edge-1")
-        restarted = RuntimeCore(self.path, trusted_clock=self.clock.wall)
-        self.assertEqual(restarted.device_slot("edge-1"), before)
-        self.assertReason("device_busy", restarted.acquire_device, "session-2", "device-admin")
-        # Persistence alone does not implement RFC-0004 Core/Edge reconciliation.
-        self.assertEqual(restarted.device_slot("edge-1"), before)
+        self.core.close()
+        with RuntimeCore(self.path, trusted_clock=self.clock.wall) as restarted:
+            after = restarted.device_slot("edge-1")
+            self.assertEqual(after["state"], "quarantined")
+            self.assertEqual(after["device_epoch"], before["device_epoch"])
+            self.assertEqual(after["session_id"], before["session_id"])
+            self.assertReason("device_state_unverified", restarted.acquire_device, "session-2", "device-admin")
+            self.assertEqual(restarted.active_leases("session-1"), [])
+            self.assertTrue(all(m["kind"] != "edge.authority_install"
+                                for _, m in restarted.pending_edge_updates("edge-1")))
 
     def test_mode_change_keeps_slot_and_epoch(self):
         self.start()
@@ -324,14 +347,13 @@ class TestDeviceExclusivity(unittest.TestCase):
         self.assertEqual(statuses.count("acquired"), 1)
         self.assertIn("fallback", statuses)
 
-    def test_suspend_disconnect_revoke_do_not_release_slot(self):
+    def test_suspend_retains_slot_until_all_grants_lost(self):
         self.start("totalmersion")
         self.second_session()
         operations = [
             lambda: self.core.owner_disconnected("session-1"),
             lambda: self.core.revoke_session_control("session-1"),
             lambda: self.core.set_policies("session-1", self.policy(version="2"), self.compliance()),
-            lambda: self.core.revoke_grant("grant-1"),
         ]
         for operation in operations:
             if self.core.session_snapshot("session-1")["session_status"] == "suspended":
@@ -340,6 +362,9 @@ class TestDeviceExclusivity(unittest.TestCase):
             operation()
             self.assert_held()
             self.assertReason("device_busy", self.core.acquire_device, "session-2", "device-admin")
+        self.core.revoke_grant("grant-1")
+        self.assertEqual(self.core.device_slot("edge-1")["state"], "transferring")
+        self.assertReason("device_transfer_pending", self.core.acquire_device, "session-2", "device-admin")
 
     def test_lease_expiry_does_not_release_slot(self):
         self.start()
@@ -471,6 +496,7 @@ class TestDeviceExclusivity(unittest.TestCase):
         self.lease()
         with closing(sqlite3.connect(self.path)) as db, db:
             db.execute("DROP TABLE device_slots")
+        self.core.close()
         self.assertReason("database_upgrade_required", RuntimeCore, self.path,
                           trusted_clock=self.clock.wall)
         with closing(sqlite3.connect(self.path)) as db, db:

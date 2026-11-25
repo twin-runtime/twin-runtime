@@ -320,7 +320,7 @@ The repository includes an **experimental, single-host reference implementation*
 
 **Not yet implemented:** authenticated external transports and providers, production-grade access control, actual human-presence verification, robot/OEM integration or physical safety enforcement. Open interfaces and conformance are still evolving; passing tests does not establish production readiness.
 
-### C-1 status: acquire-only reference
+### C-1 status: reference acquisition and lifecycle intents
 
 This is a partial implementation of [Accepted RFC-0004](rfcs/RFC-0004-physical-device-session-exclusivity.md), tracked in [Issue #6](https://github.com/twin-runtime/twin-runtime/issues/6).
 
@@ -329,12 +329,13 @@ This is a partial implementation of [Accepted RFC-0004](rfcs/RFC-0004-physical-d
 | Device classification | Core and Edge default to `physical`; only trusted, exact `digital` configuration bypasses device exclusivity |
 | Device acquisition | Explicit `acquire_device` uses a separately provisioned device principal; Session Policy controller rights alone do not authorize it |
 | Core enforcement | One durable slot and epoch per Edge, serialized acquire, and physical Lease issuance only for the holding Session |
+| Lifecycle | Terminal `end_session`, separately authorized holder `release_device` and `admin_revoke` create a non-free fence intent; no physical release is confirmed |
 | Edge enforcement | Install, revoke and command checks bind to one device epoch and Session per boot; cross-Session conflicts are rejected |
-| Retention and quarantine | Mode changes, suspend and revocation retain the slot; a boot, execution-class or acquirer change quarantines a held slot |
-| Device audit | Ordered `acquired`, `denied`, `fallback` and `quarantined` records; no `effective` event |
-| Deferred | Release, transfer, hold timeout, `end_session`, ACK/recovery, full Core restart reconciliation, Owner-only TotalMersion identity binding and observers |
+| Retention and quarantine | Mode changes retain the slot; suspended hold timeout and loss of all supporting Grants start fencing; transfer timeout, startup and untrusted clock quarantine retained authority |
+| Device audit | Ordered acquisition, denial, fallback, release/fence intent and quarantine events; no `released` or `effective` event |
+| Deferred | Authenticated device-wide fence/ACK/recovery, full Core restart reconciliation, Owner-only TotalMersion identity binding and observers |
 
-**Temporary limitation:** a physical Edge stays allocated to its first holding Session. There is no release API or recovery from quarantine in this slice. Persisting a slot across a Core restart does not implement the RFC's Core/Edge reconciliation. Existing databases from before C-1A+ are rejected with `database_upgrade_required`; no automatic migration is provided. Do not reset a live device's database to free a slot.
+**Temporary limitation:** release requests do not make physical devices free. The trusted host must poll `process_lifecycle_deadlines()` even when idle; the local web demo polls in its server loop; no verified safe-state ACK or quarantine recovery is implemented. Core restart is fail-closed, not the RFC's full reconciliation. A transactional migration preserves acquire-only device slots and epochs; older or inconsistent schemas are rejected with `database_upgrade_required`. Do not reset a live device's database to free a slot.
 
 The demos use separate `demo-device-admin` provisioning and call acquire explicitly. Their Reset button creates an isolated temporary simulation; it is not a device-release operation. See the [architecture implementation notes](ARCHITECTURE.md#c-1-implementation-status-acquire-only) for the local API and denial codes. The reference remains a software simulation with no claim of physical control confirmation.
 

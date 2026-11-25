@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:twin-runtime:schema:v0.1:device-event",
-  "title": "Twin Runtime v0.1 device-event (acquire-only reference)",
-  "description": "Durable Core-side device audit. Acquired records slot allocation, not Edge-confirmed physical control. Release, transfer and effective events are not implemented.",
+  "title": "Twin Runtime v0.1 device-event (reference lifecycle subset)",
+  "description": "Durable Core-side device audit. Acquired records slot allocation, not Edge-confirmed physical control. Release and fence requests record Core-side intent, not physical completion.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -17,7 +17,10 @@
     "device_sequence": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
     "prior_session_id": {"type": "string", "minLength": 1},
     "session_id": {"type": "string", "minLength": 1},
-    "status": {"enum": ["acquired", "denied", "fallback", "quarantined"]},
+    "status": {"enum": ["acquired", "denied", "fallback", "quarantined", "release_requested", "fence_requested"]},
+    "actor_class": {"type": "string", "minLength": 1},
+    "actor_id": {"type": "string", "minLength": 1},
+    "operation": {"type": "string", "minLength": 1},
     "reason": {"type": "string", "minLength": 1},
     "correlation_id": {"type": "string", "minLength": 1},
     "occurred_at": {"type": "string", "format": "date-time"}

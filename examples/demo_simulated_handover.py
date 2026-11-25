@@ -22,8 +22,8 @@ def stamp(value: datetime) -> str:
 def main() -> None:
     now = datetime.now(timezone.utc)
     clock = lambda: now
-    with tempfile.TemporaryDirectory(prefix='twin-runtime-demo-') as temp:
-        core = RuntimeCore(Path(temp) / 'runtime.sqlite', trusted_clock=clock)
+    with tempfile.TemporaryDirectory(prefix='twin-runtime-demo-') as temp, RuntimeCore(
+            Path(temp) / 'runtime.sqlite', trusted_clock=clock) as core:
         edge = EdgeFenceState('edge-demo', 'boot-demo',
                               supported_control_domains=['conversation'],
                               trusted_wall_clock=clock)
