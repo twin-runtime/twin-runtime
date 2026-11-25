@@ -6,17 +6,19 @@
 
 ---
 
-## C-1 implementation status: acquire-only
+<a name="c-1-implementation-status-acquire-only"></a>
 
-[RFC-0004](rfcs/RFC-0004-physical-device-session-exclusivity.md) is Accepted. Its complete lifecycle remains the target; this implementation delivers only explicit acquisition and corresponding Core/Edge enforcement.
+## C-1 implementation status: acquire and terminal Session end
+
+[RFC-0004](rfcs/RFC-0004-physical-device-session-exclusivity.md) is Accepted. Its complete lifecycle remains the target; this reference implements explicit acquisition, corresponding Core/Edge enforcement, and terminal Session end with a durable non-free transfer intent.
 
 | Boundary | Implemented in this slice | Still deferred |
 | --- | --- | --- |
 | Trusted provisioning | One `edge_id` per simulated device; default `physical`; exact `digital` opt-in; separate device acquirer | Hardware identity proof, remote authentication and OEM integration |
-| Core allocation | Durable `free / held / quarantined` slot, `device_epoch`, `BEGIN IMMEDIATE` acquire, holder-only physical Lease issuance | Release, `end_session`, suspended hold timeout and transfer |
+| Core allocation | Durable `free / held / transferring / quarantined` slot, `device_epoch`, serialized acquire, holder-only physical Lease issuance, terminal `end_session` | Holder release, admin revoke, timeout processing and verified completion |
 | Edge allocation | One boot-scoped `(device_epoch, session_id)` watermark shared by all domains; Lease-based command binding | Device-wide transfer protocol and authenticated completion ACK |
-| Restart | Durable Core slot; fresh Edge boot invalidates old authority and quarantines a held slot | Full Core restart reconciliation under RFC-0004 Section 6.6 and quarantine recovery |
-| Audit | Device-ordered acquisition, denial, fallback and quarantine records | Physical `effective` event, complete lifecycle/actor audit contract |
+| Restart | Single local Core owner; startup quarantines non-free slots; Edge reboot invalidates old authority and quarantines held/transferring slots | Full Core restart reconciliation under RFC-0004 Section 6.6 and quarantine recovery |
+| Audit | Device-ordered acquisition, denial, fallback, quarantine and correlated release/fence request records | Physical `effective` event, complete lifecycle/actor audit contract |
 | Identity and observation | Existing Session Policy and per-domain Controller checks | Authenticated Owner-only TotalMersion and read-only observer subscriptions |
 
 ### Local acquisition contract
@@ -42,7 +44,13 @@ Core includes `device_epoch` in physical Control Leases and authority install/re
 
 An authorized intra-Session fallback to Autonomous keeps the slot and epoch and is correlated with the Session's mode-change event. Session/Domain Lease generations still advance. Owner disconnect suspends the Session under existing behavior; it does not implement an automatic Autonomous fallback or free the device. A held slot remains quarantined even if its Edge is reclassified as digital.
 
-**Operational limitation:** the first holding Session retains the physical slot for this intermediate version. There is no release/recovery API. Core restart preserves the slot but does not verify it with Edge; this does **not** satisfy the full restart/recovery target. Databases without the introduced device schema are rejected with `database_upgrade_required`. No migration or database-reset recovery is supplied.
+### Local terminal Session end
+
+The trusted host explicitly binds an end-only principal with `provision_session_end(session_id, principal_id)`. This immutable reference binding does not derive from Controller, Grant, acquisition or Marketplace rights. The host must authenticate the actor before invoking `end_session(session_id, authenticated_actor_id)`. Unconfigured Sessions deny end requests. Attributable denials record a Session event and, for physical or retained non-free slots, a correlated device denial before returning the error. An authorized end is terminal and idempotent, revokes all Session-domain Leases, retires undelivered installs, and emits one `session.ended` event. It does not change a different Session's slot or create a physical slot on a digital Edge.
+
+A holding physical Session's end atomically records a new device epoch, the former holder, expected Edge boot, correlation and configured transfer deadline (reference default 30 seconds), plus correlated `release_requested` and `fence_requested` audit events. The slot stays `transferring`; no successor can acquire. At epoch exhaustion it stays quarantined. The existing per-domain revokes retain their original Lease epochs. The new device-wide intent is stored in the slot, not sent as a simulated safe-state ACK. Timeout processing, holder release, admin revoke, the authenticated device-wide fencing protocol and verified recovery are deferred. The ordinary outbox ACK cannot release the device.
+
+**Operational limitation:** a physical slot cannot be made free through Session end. Core startup quarantines retained non-free slots; the local OS ownership lock assumes a trusted local filesystem. Core restart does not verify Edge or OEM state. A transactional migration preserves existing acquire-only slot rows and epochs; older/incomplete or inconsistent device schemas are rejected with `database_upgrade_required`. A database trigger also prevents reversal of the terminal Session state. A change to Edge boot, class, acquirer or capabilities quarantines a pending fence. Database reset is not a recovery procedure.
 
 Digital MultiPresence and independent physical Edges remain separate. The previous test allowing two controlling Sessions on one unclassified Edge now explicitly uses `digital`; physical conflict tests cover the changed behavior. The demos explicitly acquire a simulated physical Edge using `demo-device-admin`, outside their Controller policies. Their temporary-database reset is only a fresh simulation.
 

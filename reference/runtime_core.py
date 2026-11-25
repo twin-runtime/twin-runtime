@@ -73,11 +73,16 @@ class RuntimeCore:
     a reboot must never reset authority generation. The wall clock is a trusted
     test/host input; Edge separately checks its installed authority using a
     monotonic clock. Device acquisition is a reference acquire-only subset;
-    release and transfer are not implemented. Restart conservatively quarantines
-    retained physical authority; authenticated reconciliation remains deferred.
+    terminal Session end records a durable transfer intent without confirming
+    physical release. Restart conservatively quarantines retained physical
+    authority; authenticated reconciliation remains deferred.
     """
 
-    def __init__(self, db_path: str | Path, *, trusted_clock: Callable[[], datetime] = _utc_now):
+    def __init__(self, db_path: str | Path, *, trusted_clock: Callable[[], datetime] = _utc_now,
+                 transfer_timeout_seconds: int = 30):
+        if type(transfer_timeout_seconds) is not int or not 1 <= transfer_timeout_seconds <= 3600:
+            raise CoreDenied("invalid_transfer_timeout")
+        self._transfer_timeout_seconds = transfer_timeout_seconds
         self._operation_lock = threading.RLock()
         self._clock = trusted_clock
         try:
@@ -115,6 +120,7 @@ class RuntimeCore:
                     "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
                 )
             }
+            migrate_slots = False
             if existing_tables:
                 required_device_schema = {
                     "edges": {"execution_class", "acquire_principal_id"},
@@ -125,6 +131,17 @@ class RuntimeCore:
                     actual = {row[1] for row in db.execute(f"PRAGMA table_info({table})")}
                     if not columns.issubset(actual):
                         raise CoreDenied("database_upgrade_required")
+                slot_columns = {row[1] for row in db.execute("PRAGMA table_info(device_slots)")}
+                lifecycle_columns = {"transfer_deadline", "fence_boot_id", "fence_correlation_id"}
+                old_columns = required_device_schema["device_slots"]
+                if "device_slots_pre_lifecycle" in existing_tables:
+                    raise CoreDenied("database_upgrade_required")
+                if slot_columns == old_columns:
+                    # Preserve every old slot/epoch in the same transaction; no reset.
+                    db.execute("ALTER TABLE device_slots RENAME TO device_slots_pre_lifecycle")
+                    migrate_slots = True
+                elif not lifecycle_columns.issubset(slot_columns):
+                    raise CoreDenied("database_upgrade_required")
             schema_sql = """
                 CREATE TABLE IF NOT EXISTS edges (
                     edge_id TEXT PRIMARY KEY, boot_id TEXT NOT NULL, domains TEXT NOT NULL,
@@ -145,6 +162,9 @@ class RuntimeCore:
                     presence_mode TEXT, operational_state TEXT NOT NULL,
                     policy_id TEXT, policy_version TEXT, compliance_id TEXT,
                     compliance_version TEXT, created_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS session_end_principals (
+                    session_id TEXT PRIMARY KEY, principal_id TEXT NOT NULL CHECK(length(principal_id)>0)
                 );
                 CREATE TABLE IF NOT EXISTS policies (
                     kind TEXT NOT NULL, policy_id TEXT NOT NULL, version TEXT NOT NULL,
@@ -172,10 +192,15 @@ class RuntimeCore:
                 );
                 CREATE TABLE IF NOT EXISTS device_slots (
                     edge_id TEXT PRIMARY KEY,
-                    state TEXT NOT NULL CHECK(state IN ('free','held','quarantined')),
+                    state TEXT NOT NULL CHECK(state IN ('free','held','transferring','quarantined')),
                     session_id TEXT,
                     device_epoch INTEGER NOT NULL CHECK(device_epoch>=0),
-                    reason TEXT, updated_at TEXT NOT NULL
+                    reason TEXT, updated_at TEXT NOT NULL,
+                    transfer_deadline TEXT, fence_boot_id TEXT, fence_correlation_id TEXT,
+                    CHECK(state!='transferring' OR (
+                        session_id IS NOT NULL AND transfer_deadline IS NOT NULL
+                        AND fence_boot_id IS NOT NULL AND fence_correlation_id IS NOT NULL
+                    ))
                 );
                 CREATE TABLE IF NOT EXISTS device_events (
                     edge_id TEXT NOT NULL, device_sequence INTEGER NOT NULL,
@@ -187,6 +212,27 @@ class RuntimeCore:
             for statement in schema_sql.split(";"):
                 if statement.strip():
                     db.execute(statement)
+            if migrate_slots:
+                db.execute("""INSERT INTO device_slots(edge_id,state,session_id,device_epoch,reason,updated_at)
+                              SELECT edge_id,state,session_id,device_epoch,reason,updated_at
+                              FROM device_slots_pre_lifecycle""")
+                db.execute("DROP TABLE device_slots_pre_lifecycle")
+            # A column-only migration can leave the old state CHECK in place.
+            # Compare with the exact reference definition before issuing authority.
+            expected_slot_sql = next(
+                statement.strip().replace("CREATE TABLE IF NOT EXISTS", "CREATE TABLE", 1)
+                for statement in schema_sql.split(";")
+                if statement.strip().startswith("CREATE TABLE IF NOT EXISTS device_slots (")
+            )
+            actual_slot_sql = db.execute(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name='device_slots'"
+            ).fetchone()
+            if actual_slot_sql is None or " ".join(actual_slot_sql[0].split()) != " ".join(expected_slot_sql.split()):
+                raise CoreDenied("database_upgrade_required")
+            db.execute("""CREATE TRIGGER IF NOT EXISTS session_ended_terminal
+                BEFORE UPDATE ON sessions
+                WHEN OLD.status='ended' AND (NEW.status IS NOT 'ended' OR NEW.presence_mode IS NOT NULL)
+                BEGIN SELECT RAISE(ABORT, 'session_ended'); END""")
             self._quarantine_retained_authority(db)
 
     def _quarantine_retained_authority(self, db: sqlite3.Connection) -> None:
@@ -277,7 +323,8 @@ class RuntimeCore:
 
     def _device_audit(self, db: sqlite3.Connection, edge_id: str, status: str,
                       reason: str, correlation_id: str, *, session_id: str | None = None,
-                      prior_session_id: str | None = None) -> None:
+                      prior_session_id: str | None = None,
+                      actor_class: str | None = None, actor_id: str | None = None) -> None:
         slot=self._need(db.execute('SELECT * FROM device_slots WHERE edge_id=?', (edge_id,)).fetchone(), 'device_slot')
         edge=self._need(db.execute('SELECT * FROM edges WHERE edge_id=?', (edge_id,)).fetchone(), 'edge')
         seq=db.execute('SELECT COALESCE(MAX(device_sequence),0)+1 FROM device_events WHERE edge_id=?',
@@ -290,6 +337,10 @@ class RuntimeCore:
             event['session_id']=session_id
         if prior_session_id is not None:
             event['prior_session_id']=prior_session_id
+        if actor_class is not None:
+            event['actor_class'] = actor_class
+        if actor_id is not None:
+            event['actor_id'] = actor_id
         _validate('device-event', event)
         db.execute('INSERT INTO device_events(edge_id,device_sequence,record) VALUES(?,?,?)',
                    (edge_id,seq,_json(event)))
@@ -298,6 +349,8 @@ class RuntimeCore:
     def _device_guard(db: sqlite3.Connection, edge_id: str, session_id: str | None = None) -> sqlite3.Row:
         slot=RuntimeCore._need(db.execute('SELECT * FROM device_slots WHERE edge_id=?',
                                            (edge_id,)).fetchone(),'device_slot')
+        if slot['state'] == 'transferring':
+            raise CoreDenied('device_transfer_pending')
         if slot['state'] not in ('free', 'held'):
             raise CoreDenied('device_state_unverified')
         if session_id is not None and (slot['state']!='held' or slot['session_id']!=session_id):
@@ -356,15 +409,20 @@ class RuntimeCore:
             slot=self._need(db.execute('SELECT * FROM device_slots WHERE edge_id=?',
                                        (session['edge_id'],)).fetchone(),'device_slot')
             # Retain denials on the known device, even when Policy checks fail.
-            try:
-                policy=self._policy(db,'session_policy',session['policy_id'],session['policy_version'])
-                compliance=self._policy(db,'compliance_policy',session['compliance_id'],session['compliance_version'])
-            except CoreDenied as error:
-                denial=error.reason
+            if session['status'] == 'ended':
+                denial = 'session_ended'
+            else:
+                try:
+                    policy=self._policy(db,'session_policy',session['policy_id'],session['policy_version'])
+                    compliance=self._policy(db,'compliance_policy',session['compliance_id'],session['compliance_version'])
+                except CoreDenied as error:
+                    denial=error.reason
             # A class change cannot turn a quarantined physical slot into an
             # unrestricted digital endpoint.
             if denial is not None:
                 pass  # A Policy denial already takes precedence.
+            elif slot['state'] == 'transferring':
+                denial='device_transfer_pending'
             elif slot['state'] not in ('free', 'held'):
                 denial='device_state_unverified'
             elif edge['execution_class']=='digital':
@@ -452,6 +510,119 @@ class RuntimeCore:
         for lease in self._lease_records(db,sid):
             self._revoke_lease(db,lease,reason,corr)
 
+    @staticmethod
+    def _discard_session_installs(db: sqlite3.Connection, session: sqlite3.Row) -> None:
+        """Retire queued installs only; this is not proof of Edge receipt or safe stop."""
+        for row in db.execute("SELECT update_id,payload FROM edge_outbox WHERE edge_id=? AND acknowledged=0",
+                              (session["edge_id"],)).fetchall():
+            payload = json.loads(row["payload"])
+            if payload["kind"] == "edge.authority_install" and payload["session_id"] == session["session_id"]:
+                db.execute("UPDATE edge_outbox SET acknowledged=1 WHERE update_id=?", (row["update_id"],))
+
+    def _request_device_fence(self, db: sqlite3.Connection, session: sqlite3.Row,
+                              slot: sqlite3.Row, reason: str, corr: str,
+                              actor_class: str, actor_id: str) -> None:
+        """Persist a device-wide fence intent, never an Edge/OEM acknowledgement.
+
+        The existing per-domain revoke messages use their original Lease epoch.
+        The durable new-epoch intent is NOT an edge.authority_revoke wire message.
+        It is retained for the future authenticated device-wide fence protocol.
+        """
+        sid, edge_id = session["session_id"], session["edge_id"]
+        if slot["state"] != "held" or slot["session_id"] != sid:
+            raise CoreDenied("device_not_acquired")
+        edge = self._need(db.execute("SELECT * FROM edges WHERE edge_id=?", (edge_id,)).fetchone(), "edge")
+        now = self._now()
+        refs = dict(session_id=sid, prior_session_id=sid, actor_class=actor_class, actor_id=actor_id)
+        if slot["device_epoch"] >= 2**53-1:
+            # No representable next epoch: retain a non-free device indefinitely.
+            db.execute("UPDATE device_slots SET state='quarantined',reason=?,updated_at=? WHERE edge_id=?",
+                       ("device_epoch_exhausted", _stamp(now), edge_id))
+            self._device_audit(db, edge_id, "release_requested", reason, corr, **refs)
+            self._device_audit(db, edge_id, "quarantined", "device_epoch_exhausted", corr, **refs)
+            return
+        db.execute("""UPDATE device_slots SET state='transferring',device_epoch=?,reason=?,updated_at=?,
+                      transfer_deadline=?,fence_boot_id=?,fence_correlation_id=? WHERE edge_id=?""",
+                   (slot["device_epoch"] + 1, reason, _stamp(now),
+                    _stamp(now + timedelta(seconds=self._transfer_timeout_seconds)), edge["boot_id"], corr, edge_id))
+        self._device_audit(db, edge_id, "release_requested", reason, corr, **refs)
+        self._device_audit(db, edge_id, "fence_requested", reason, corr, **refs)
+
+    def provision_session_end(self, session_id: str, principal_id: str) -> None:
+        """Trusted local host provisioning; never a client self-assignment.
+
+        Explicitly bind one end-only principal to a Session. Existing Sessions
+        are unconfigured until provisioned. No acquire or Controller authority
+        is inferred, and this reference has no binding rotation API.
+        """
+        if not isinstance(principal_id, str) or not principal_id:
+            raise CoreDenied("invalid_session_end_principal")
+        with self._transaction() as db:
+            session = self._session(db, session_id)
+            if session["status"] == "ended":
+                raise CoreDenied("session_ended")
+            existing = db.execute("SELECT principal_id FROM session_end_principals WHERE session_id=?",
+                                  (session_id,)).fetchone()
+            if existing is not None:
+                if existing["principal_id"] != principal_id:
+                    raise CoreDenied("session_end_principal_immutable")
+                return
+            db.execute("INSERT INTO session_end_principals(session_id,principal_id) VALUES(?,?)",
+                       (session_id, principal_id))
+
+    def end_session(self, session_id: str, authenticated_actor_id: str) -> None:
+        """Terminal Core-side Session end; authenticated identity comes from the trusted host.
+
+        Revoke all Session-domain Leases, retire undelivered installs, and
+        retain a held physical device in a non-free state. Repeated authorized
+        requests are idempotent. Neither Session end nor a per-domain ACK
+        establishes physical release.
+        """
+        authenticated = isinstance(authenticated_actor_id, str) and bool(authenticated_actor_id)
+        denial = None
+        with self._transaction() as db:
+            session = db.execute("SELECT * FROM sessions WHERE session_id=?", (session_id,)).fetchone() if isinstance(session_id, str) else None
+            if session is None:
+                raise CoreDenied("unknown_session" if authenticated else "principal_not_authenticated")
+            principal = db.execute("SELECT principal_id FROM session_end_principals WHERE session_id=?",
+                                   (session_id,)).fetchone()
+            if not authenticated:
+                denial = "principal_not_authenticated"
+            elif principal is None or principal["principal_id"] != authenticated_actor_id:
+                denial = "session_end_not_authorized"
+            if denial is not None:
+                corr = "operation_" + uuid4().hex
+                actor_class = "authenticated_principal" if authenticated else "unauthenticated"
+                actor = {"actor_id": authenticated_actor_id} if authenticated else {}
+                self._audit(db, session_id, "session.end_denied", corr,
+                            data={"reason": denial, "actor_class": actor_class, **actor})
+                edge = self._need(db.execute("SELECT * FROM edges WHERE edge_id=?",
+                                             (session["edge_id"],)).fetchone(), "edge")
+                slot = self._need(db.execute("SELECT * FROM device_slots WHERE edge_id=?",
+                                             (session["edge_id"],)).fetchone(), "device_slot")
+                if edge["execution_class"] != "digital" or slot["state"] != "free":
+                    self._device_audit(db, session["edge_id"], "denied", denial, corr,
+                                       session_id=session_id, prior_session_id=slot["session_id"],
+                                       actor_class=actor_class, **actor)
+            elif session["status"] != "ended":
+                slot = self._need(db.execute("SELECT * FROM device_slots WHERE edge_id=?",
+                                             (session["edge_id"],)).fetchone(), "device_slot")
+                corr = "operation_" + uuid4().hex
+                self._revoke_session(db, session_id, "session_ended", corr)
+                self._discard_session_installs(db, session)
+                if slot["state"] == "held" and slot["session_id"] == session_id:
+                    self._request_device_fence(db, session, slot, "session_ended", corr,
+                                               "session_end_principal", authenticated_actor_id)
+                db.execute("UPDATE sessions SET status='ended',presence_mode=NULL,operational_state='standby' WHERE session_id=?",
+                           (session_id,))
+                if session["presence_mode"] is not None:
+                    self._audit(db, session_id, "presence_mode.changed", corr,
+                                data={"from_mode": session["presence_mode"], "to_mode": None, "reason": "session_ended"})
+                self._audit(db, session_id, "session.ended", corr,
+                            data={"actor_class": "session_end_principal", "actor_id": authenticated_actor_id})
+        if denial is not None:
+            raise CoreDenied(denial)
+
     def _suspend(self, db: sqlite3.Connection, session: sqlite3.Row, reason: str, corr: str) -> None:
         sid=session["session_id"]
         self._revoke_session(db,sid,reason,corr)
@@ -510,8 +681,8 @@ class RuntimeCore:
             if boot_changed or class_changed or capabilities_changed or acquirer_changed:
                 corr="operation_"+uuid4().hex
                 slot=db.execute('SELECT * FROM device_slots WHERE edge_id=?',(edge_id,)).fetchone()
-                if slot['state']=='held' and (boot_changed or class_changed or acquirer_changed):
-                    reason='edge_restarted' if boot_changed else ('edge_reclassified' if class_changed else 'acquirer_changed')
+                if slot['state']=='transferring' or (slot['state']=='held' and (boot_changed or class_changed or acquirer_changed)):
+                    reason='edge_restarted' if boot_changed else ('edge_reclassified' if class_changed else ('acquirer_changed' if acquirer_changed else 'edge_capabilities_changed'))
                     db.execute("UPDATE device_slots SET state='quarantined',reason=?,updated_at=? WHERE edge_id=?",
                                (reason,_stamp(self._now()),edge_id))
                     self._device_audit(db,edge_id,'quarantined',reason,corr,
@@ -616,6 +787,8 @@ class RuntimeCore:
     def prepare_session(self, session_id: str) -> None:
         with self._transaction() as db:
             session=self._session(db,session_id)
+            if session["status"]=="ended":
+                raise CoreDenied("session_ended")
             if session["status"]!="created":
                 raise CoreDenied("invalid_session_state")
             policy=self._policy(db,"session_policy",session["policy_id"],session["policy_version"])
@@ -640,6 +813,8 @@ class RuntimeCore:
             raise CoreDenied("unknown_presence_mode")
         with self._transaction() as db:
             session=self._session(db,session_id)
+            if session["status"]=="ended":
+                raise CoreDenied("session_ended")
             if session["status"] not in ("ready","suspended"):
                 raise CoreDenied("invalid_session_state")
             self._device_guard(db,session['edge_id'])
@@ -659,6 +834,8 @@ class RuntimeCore:
             raise CoreDenied("unknown_presence_mode")
         with self._transaction() as db:
             session=self._session(db,session_id)
+            if session["status"]=="ended":
+                raise CoreDenied("session_ended")
             self._device_guard(db,session['edge_id'])
             if session["status"]!="active":
                 raise CoreDenied("session_not_active")
@@ -695,6 +872,8 @@ class RuntimeCore:
             raise CoreDenied("invalid_lease_timeout")
         with self._transaction() as db:
             session=self._session(db,session_id)
+            if session["status"]=="ended":
+                raise CoreDenied("session_ended")
             self._device_guard(db,session['edge_id'])
             if session["status"]!="active" or not session["presence_mode"]:
                 raise CoreDenied("session_not_active")
