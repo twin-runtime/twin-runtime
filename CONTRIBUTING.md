@@ -42,6 +42,20 @@ Never bypass manufacturer safety controls or expose raw motor/torque control thr
 
 Do not label an adapter **"Twin Runtime compatible"** or **"certified"** until published conformance tests and a defined verification process exist and have been satisfied. Conformance, when available, will not be physical robot safety certification.
 
+## AI-Assisted Contributions
+
+AI-assisted contributions are welcome.
+
+Contributors must:
+- Review and understand all submitted changes.
+- Verify that they have the right to submit the contribution under Apache-2.0, including any AI-generated material.
+- Run relevant tests or disclose why testing was not possible.
+- Briefly disclose material AI assistance in the Pull Request description, including how the changes were validated.
+
+AI tools cannot provide DCO sign-off on behalf of contributors.
+
+The submitting contributor remains responsible for compliance with the existing DCO requirements.
+
 ## Developer Certificate of Origin (DCO)
 
 Contributors certify they have the right to submit each contribution under Apache-2.0. Read the [Developer Certificate of Origin](https://developercertificate.org/).

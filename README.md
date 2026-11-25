@@ -369,8 +369,16 @@ Significant semantic or architectural changes require an Issue and follow the [R
 
 ---
 
+## Project Stewardship
+
+Twin Runtime is an independent open-source project initiated and maintained by Paweł Woźniak.
+
+Development is supported by AI tools.
+
+---
+
 ## License
 
 Apache License 2.0.
 
-See [LICENSE](LICENSE).
+See [LICENSE](LICENSE) and [NOTICE](NOTICE).
