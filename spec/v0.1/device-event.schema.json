@@ -20,6 +20,7 @@
     "status": {"enum": ["acquired", "denied", "fallback", "quarantined", "release_requested", "fence_requested"]},
     "actor_class": {"type": "string", "minLength": 1},
     "actor_id": {"type": "string", "minLength": 1},
+    "operation": {"type": "string", "minLength": 1},
     "reason": {"type": "string", "minLength": 1},
     "correlation_id": {"type": "string", "minLength": 1},
     "occurred_at": {"type": "string", "format": "date-time"}
